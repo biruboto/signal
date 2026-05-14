@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>001 — entropy clock</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    body {
+      background: #0a0a0f;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    .clock-label {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: #4a4a5a;
+      letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <canvas id="canvas"></canvas>
+    <div class="clock-label" id="label"></div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    // entropy clock — a clock that renders the entropy of the current moment
+    // each second is unique, never to occur again
+
+    let particles = [];
+    const PARTICLE_COUNT = 333;
+    const now = new Date();
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      colorMode(HSB, 360, 100, 100, 100);
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: random(width),
+          y: random(height),
+          vx: 0,
+          vy: 0,
+          phase: random(TWO_PI),
+          speed: random(0.2, 0.8),
+          size: random(1, 3)
+        });
+      }
+    }
+
+    function draw() {
+      // fade rather than clear — creates trails
+      noStroke();
+      fill(10, 10, 15, 8);
+      rect(0, 0, width, height);
+
+      const h = hour();
+      const m = minute();
+      const s = second();
+      const ms = millis();
+
+      // entropy: higher when time is "more random"
+      // we encode h, m, s into a pseudo-entropy value
+      const entropy = ((h * 3600 + m * 60 + s) * 1000 + ms) / (24 * 3600 * 1000);
+
+      // hue shifts slowly over the day
+      const hue = (entropy * 360 + frameCount * 0.1) % 360;
+      const saturation = 60 + sin(entropy * PI) * 30;
+      const brightness = 70 + entropy * 20;
+
+      stroke(hue, saturation, brightness, 60);
+      noFill();
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        // each particle responds to entropy and time
+        const freq = 0.001 + entropy * 0.002;
+        const wave = sin(frameCount * p.speed * 0.02 + p.phase + entropy * 10);
+
+        p.vx += cos(frameCount * freq + p.x * 0.001) * 0.05 * (wave + 0.5);
+        p.vy += sin(frameCount * freq + p.y * 0.001) * 0.05 * (wave + 0.5);
+
+        p.vx *= 0.95;
+        p.vy *= 0.95;
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // wrap edges
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        // draw connection lines to nearby particles
+        for (let j = i + 1; j < particles.length; j++) {
+          const other = particles[j];
+          const d = dist(p.x, p.y, other.x, other.y);
+
+          if (d < 80) {
+            const alpha = map(d, 0, 80, 40, 0);
+            stroke(hue, saturation, brightness, alpha);
+            line(p.x, p.y, other.x, other.y);
+          }
+        }
+
+        // draw particle
+        noStroke();
+        fill(hue, saturation, brightness, 80);
+        circle(p.x, p.y, p.size);
+      }
+
+      // center pulse — responds to seconds
+      const pulse = sin(s * TWO_PI / 60) * 0.5 + 0.5;
+      noStroke();
+      fill(hue, 30, 90, pulse * 20);
+      circle(width / 2, height / 2, 200 + pulse * 100);
+
+      // update label
+      const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      document.getElementById('label').textContent = `entropy: ${entropy.toFixed(6)} — ${timeStr}`;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
