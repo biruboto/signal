@@ -1,0 +1,133 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --fg: #e8e8e2;
+  --accent: #7b7b8e;
+  --dim: #4a4a5a;
+}
+
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+header {
+  padding: 4rem 0;
+  border-bottom: 1px solid var(--dim);
+  margin-bottom: 3rem;
+}
+
+h1 {
+  font-size: 3rem;
+  font-weight: normal;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--accent);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+}
+
+h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  margin-bottom: 1.5rem;
+  font-weight: normal;
+}
+
+.experiments {
+  flex: 1;
+}
+
+#experiment-list {
+  list-style: none;
+}
+
+#experiment-list li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--dim);
+}
+
+#experiment-list li:first-child {
+  border-top: 1px solid var(--dim);
+}
+
+#experiment-list a {
+  color: var(--fg);
+  text-decoration: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+}
+
+#experiment-list a:hover {
+  color: var(--accent);
+}
+
+.experiment-title {
+  flex: 1;
+}
+
+.experiment-date {
+  color: var(--dim);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.about {
+  margin-top: 4rem;
+  padding: 2rem 0;
+  border-top: 1px solid var(--dim);
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+footer {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--dim);
+  color: var(--dim);
+  font-size: 0.75rem;
+}
+
+footer a {
+  color: var(--dim);
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 1.5rem;
+  }
+  
+  h1 {
+    font-size: 2rem;
+  }
+  
+  #experiment-list a {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
