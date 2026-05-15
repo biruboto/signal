@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '002-phase-field', title: 'phase field', date: '2026-05-15' },
   { id: '001-entropy-clock', title: 'entropy clock', date: '2026-05-14' }
 ];
 

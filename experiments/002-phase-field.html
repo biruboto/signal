@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>phase field</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; overflow: hidden; margin: 0; }
+    canvas { display: block; }
+    #info {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      color: #444;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">phase field — oscillators coupled to neighbors</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const COLS = 40;
+    const ROWS = 26;
+    const CELL_W = () => width / COLS;
+    const CELL_H = () => height / ROWS;
+
+    // Each cell has a phase [0, 1) and a natural frequency
+    // Actual angular velocity = natural_freq + coupling * sin(2π * (neighbor_phase - phase))
+    let cells = [];
+    let couplings = [];
+
+    const NATURAL_FREQ_SPREAD = 0.0008;
+    const COUPLING_STRENGTH = 0.004;
+    const DAMPING = 0.9985;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      colorMode(HSB, 1);
+
+      // Initialize phases and frequencies from white noise
+      cells = [];
+      for (let i = 0; i < COLS * ROWS; i++) {
+        cells.push({
+          phase: Math.random(),
+          freq: NATURAL_FREQ_SPREAD * (Math.random() - 0.5) + 0.0012,
+          angularVel: 0
+        });
+      }
+
+      // Coupling strength falls off with distance
+      couplings = [];
+      for (let i = 0; i < COLS * ROWS; i++) {
+        couplings.push({});
+      }
+    }
+
+    function getIdx(x, y) {
+      x = (x + COLS) % COLS;
+      y = (y + ROWS) % ROWS;
+      return y * COLS + x;
+    }
+
+    function getNeighbors(x, y) {
+      return [
+        [x - 1, y], [x + 1, y],
+        [x, y - 1], [x, y + 1],
+        [x - 1, y - 1], [x + 1, y - 1],
+        [x - 1, y + 1], [x + 1, y + 1]
+      ].filter(([nx, ny]) => nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS);
+    }
+
+    function draw() {
+      background(0.04, 0.1);
+
+      const cw = CELL_W();
+      const ch = CELL_H();
+
+      // Compute angular velocities from Kuramoto-style coupling
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const idx = getIdx(x, y);
+          const cell = cells[idx];
+
+          let coupling = 0;
+          const neighbors = getNeighbors(x, y);
+          for (const [nx, ny] of neighbors) {
+            const nIdx = getIdx(nx, ny);
+            const neighbor = cells[nIdx];
+            // sin(2π * Δphase) — pull toward neighbor's phase
+            coupling += Math.sin((neighbor.phase - cell.phase) * TWO_PI);
+          }
+          coupling *= COUPLING_STRENGTH / neighbors.length;
+
+          cell.angularVel = (cell.freq + coupling) * DAMPING;
+          cell.phase += cell.angularVel;
+          if (cell.phase >= 1) cell.phase -= 1;
+          if (cell.phase < 0) cell.phase += 1;
+        }
+      }
+
+      // Draw cells as hue-shifted arcs
+      noFill();
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const idx = getIdx(x, y);
+          const cell = cells[idx];
+
+          // Map phase to hue (240° blue to 300° violet range, with some spread)
+          const hue = (0.65 + cell.phase * 0.15) % 1;
+          const brightness = 0.3 + cell.angularVel * 80;
+          stroke(hue, 0.6, Math.min(1, brightness));
+
+          const cx = x * cw + cw / 2;
+          const cy = y * ch + ch / 2;
+          const r = Math.min(cw, ch) * 0.38;
+
+          // Arc from 0 to 2π × angularVel (visualize velocity)
+          const arcLen = max(0.01, abs(cell.angularVel) * 25);
+          strokeWeight(1.2);
+          arc(cx, cy, r * 2, r * 2, cell.phase * TWO_PI, cell.phase * TWO_PI + arcLen);
+        }
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
