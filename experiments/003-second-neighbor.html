@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>second neighbor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const N = 180;
+    let particles = [];
+
+    class Particle {
+      constructor() {
+        this.pos = createVector(random(width), random(height));
+        this.vel = p5.Vector.random2D().mult(random(0.4, 1.0));
+        this.acc = createVector(0, 0);
+      }
+
+      step(all) {
+        // find nearest and second-nearest neighbors
+        let first = null, second = null;
+        let d1 = Infinity, d2 = Infinity;
+
+        for (let o of all) {
+          if (o === this) continue;
+          let d = p5.Vector.dist(this.pos, o.pos);
+          if (d < d1) {
+            d2 = d1; second = first;
+            d1 = d;  first = o;
+          } else if (d < d2) {
+            d2 = d; second = o;
+          }
+        }
+
+        if (first && second) {
+          // attract to second neighbor — anti-hierarchical pull
+          let pull = p5.Vector.sub(second.pos, this.pos);
+          let separation = p5.Vector.sub(first.pos, this.pos);
+          // offset the attraction toward the gap between 1st and 2nd
+          pull.add(separation.mult(-0.25));
+          pull.limit(0.35);
+          this.acc.add(pull);
+        }
+
+        this.vel.add(this.acc);
+        this.vel.limit(2.2);
+        this.pos.add(this.vel);
+        this.acc.mult(0);
+
+        // soft boundary
+        if (this.pos.x < 0) this.vel.x += 0.08;
+        if (this.pos.x > width) this.vel.x -= 0.08;
+        if (this.pos.y < 0) this.vel.y += 0.08;
+        if (this.pos.y > height) this.vel.y -= 0.08;
+      }
+
+      draw() {
+        let spd = this.vel.mag();
+        let hue = map(spd, 0, 2.2, 170, 280);
+        let alpha = map(spd, 0, 2.2, 60, 200);
+        stroke(200, 220, 255, alpha);
+        strokeWeight(1.2);
+        let len = spd * 4;
+        let tip = p5.Vector.add(this.pos, p5.Vector.mult(this.vel.copy().normalize(), len));
+        line(this.pos.x, this.pos.y, tip.x, tip.y);
+      }
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      colorMode(HSB, 360, 100, 100, 255);
+      for (let i = 0; i < N; i++) particles.push(new Particle());
+    }
+
+    function draw() {
+      background(10, 8, 18, 28);
+      for (let p of particles) {
+        p.step(particles);
+        p.draw();
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
