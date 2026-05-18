@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>residue choir</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #05070b;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      color: rgba(222, 232, 255, 0.58);
+      font-size: 12px;
+      letter-spacing: 0.045em;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 18px rgba(127, 174, 255, 0.28);
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">residue choir · modular clocks sing only when their remainders agree</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const moduli = [5, 7, 11, 13, 17, 19, 23];
+    const glyphs = ['·', '∶', '∷', '⁙', '⊙', '⊚', '✧'];
+    let singers = [];
+    let traces = [];
+    let seed;
+    let pulse = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      seed = floor(random(1e9));
+      initialize();
+    }
+
+    function initialize() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      singers = [];
+      traces = [];
+      const count = constrain(floor((width * height) / 11500), 42, 140);
+
+      for (let i = 0; i < count; i++) {
+        const m = moduli[i % moduli.length];
+        singers.push({
+          x: random(width),
+          y: random(height),
+          a: random(TAU),
+          r: random(18, min(width, height) * 0.28),
+          n: floor(random(10000)),
+          m,
+          hue: map(i % moduli.length, 0, moduli.length - 1, 178, 306),
+          drift: random(0.002, 0.011) * (random() < 0.5 ? -1 : 1),
+          bias: random(TAU)
+        });
+      }
+    }
+
+    function draw() {
+      pulse++;
+      background(225, 46, 4, 34);
+
+      // Rule: each singer carries an integer through a modular clock.
+      // Nearby singers do not interact by distance alone; they must share
+      // a remainder under at least one modulus. Agreement deposits a trace.
+      const centerX = width * 0.5;
+      const centerY = height * 0.5;
+      const timeResidue = floor(frameCount / 9);
+
+      for (const s of singers) {
+        s.n += 1 + (pulse % s.m === 0 ? 1 : 0);
+        s.a += s.drift + sin((pulse + s.n) * 0.003 + s.bias) * 0.003;
+        const wobble = noise(s.n * 0.006, s.m * 0.13, pulse * 0.004) - 0.5;
+        const orbit = s.r + wobble * 55;
+        s.x = lerp(s.x, centerX + cos(s.a * (1 + 1 / s.m)) * orbit + sin(pulse * 0.006 + s.bias) * width * 0.16, 0.055);
+        s.y = lerp(s.y, centerY + sin(s.a) * orbit + cos(pulse * 0.004 + s.bias) * height * 0.12, 0.055);
+      }
+
+      const threshold = 84 + sin(pulse * 0.017) * 24;
+      for (let i = 0; i < singers.length; i++) {
+        for (let j = i + 1; j < singers.length; j++) {
+          const a = singers[i];
+          const b = singers[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > threshold * threshold) continue;
+
+          let agreements = 0;
+          let modulus = 0;
+          for (const m of moduli) {
+            const ra = (a.n + timeResidue) % m;
+            const rb = (b.n + floor(dist(a.x, a.y, b.x, b.y))) % m;
+            if (ra === rb) {
+              agreements++;
+              modulus = m;
+            }
+          }
+
+          if (agreements > 0) {
+            traces.push({
+              ax: a.x, ay: a.y, bx: b.x, by: b.y,
+              life: 92 + agreements * 22,
+              max: 92 + agreements * 22,
+              hue: (a.hue + b.hue) * 0.5 + agreements * 11,
+              weight: agreements,
+              glyph: glyphs[(modulus + agreements + pulse) % glyphs.length]
+            });
+          }
+        }
+      }
+
+      blendMode(ADD);
+      for (let k = traces.length - 1; k >= 0; k--) {
+        const tr = traces[k];
+        const u = tr.life / tr.max;
+        const bow = sin((1 - u) * PI) * 24 * tr.weight;
+        const mx = (tr.ax + tr.bx) * 0.5 + bow * sin(pulse * 0.01 + k);
+        const my = (tr.ay + tr.by) * 0.5 - bow * cos(pulse * 0.011 + k);
+
+        noFill();
+        stroke(tr.hue % 360, 48 + tr.weight * 10, 88, 105 * u);
+        strokeWeight(0.45 + tr.weight * 0.42);
+        bezier(tr.ax, tr.ay, mx, my, mx, my, tr.bx, tr.by);
+
+        if (tr.weight > 1 || tr.life % 19 === 0) {
+          noStroke();
+          fill((tr.hue + 40) % 360, 28, 96, 130 * u);
+          textSize(10 + tr.weight * 2);
+          textAlign(CENTER, CENTER);
+          text(tr.glyph, mx, my);
+        }
+
+        tr.life--;
+        if (tr.life <= 0) traces.splice(k, 1);
+      }
+      blendMode(BLEND);
+
+      drawSingers();
+      drawResidueStaff();
+
+      if (traces.length > 900) traces.splice(0, traces.length - 900);
+    }
+
+    function drawSingers() {
+      noStroke();
+      for (const s of singers) {
+        const r = (s.n % s.m) / (s.m - 1);
+        fill(s.hue, 52, 72 + r * 25, 70);
+        circle(s.x, s.y, 2.2 + r * 5.5);
+        if ((s.n + pulse) % s.m === 0) {
+          noFill();
+          stroke(s.hue, 30, 95, 88);
+          strokeWeight(0.8);
+          circle(s.x, s.y, 10 + s.m * 0.55);
+          noStroke();
+        }
+      }
+    }
+
+    function drawResidueStaff() {
+      push();
+      translate(18, 26);
+      textSize(11);
+      textAlign(LEFT, CENTER);
+      for (let i = 0; i < moduli.length; i++) {
+        const m = moduli[i];
+        const y = i * 18;
+        const x = 72 + ((pulse * (i + 2)) % max(120, width - 190));
+        const residue = (floor(pulse / (i + 3)) + m) % m;
+        stroke(map(i, 0, moduli.length - 1, 178, 306), 40, 70, 52);
+        strokeWeight(1);
+        line(72, y, min(width - 44, 72 + width * 0.28), y);
+        noStroke();
+        fill(216, 12, 82, 130);
+        text('mod ' + m + ' → ' + residue, 0, y);
+        fill(map(i, 0, moduli.length - 1, 178, 306), 38, 95, 115);
+        circle(x, y, 3 + residue * 0.26);
+      }
+      pop();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      initialize();
+    }
+  </script>
+</body>
+</html>
