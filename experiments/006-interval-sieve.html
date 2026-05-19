@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>interval sieve</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #04060a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      color: rgba(220, 232, 255, 0.58);
+      font-size: 12px;
+      letter-spacing: 0.045em;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 18px rgba(117, 186, 255, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">interval sieve · a lattice keeps only the gaps that survive several clocks</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const primes = [3, 5, 7, 11, 13, 17, 19];
+    const glyphs = ['·', '∶', '∷', '⁙', '⊙', '⊚', '✦', '∴'];
+    let nodes = [];
+    let witnesses = [];
+    let seed;
+    let spacing;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      nodes = [];
+      witnesses = [];
+      spacing = constrain(floor(min(width, height) / 18), 30, 54);
+      const cols = ceil(width / spacing) + 3;
+      const rows = ceil(height / spacing) + 3;
+      const ox = (width - (cols - 1) * spacing) * 0.5;
+      const oy = (height - (rows - 1) * spacing) * 0.5;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const id = x + y * cols;
+          nodes.push({
+            id,
+            gx: x,
+            gy: y,
+            x: ox + x * spacing,
+            y: oy + y * spacing,
+            salt: floor(random(10000)),
+            p: primes[(x * 2 + y * 3) % primes.length],
+            phase: random(TAU),
+            charge: 0
+          });
+        }
+      }
+    }
+
+    function draw() {
+      background(222, 48, 4, 38);
+      const t = floor(frameCount / 3);
+      const drift = frameCount * 0.006;
+
+      // Rule: every lattice point proposes a diagonal interval. The interval is
+      // visible only when present-time and offset-time leave matching residues
+      // under enough prime clocks. The machine is not drawing lines; it is
+      // preserving coincidences between incompatible ways of counting.
+      for (const n of nodes) {
+        n.charge *= 0.91;
+        const tide = noise(n.gx * 0.08, n.gy * 0.08, frameCount * 0.006);
+        const wobble = (tide - 0.5) * spacing * 0.42;
+        const angle = n.phase + drift * (1 + 1 / n.p) + sin(frameCount * 0.011 + n.salt) * 0.22;
+        n.sx = n.x + cos(angle) * wobble;
+        n.sy = n.y + sin(angle * 1.3) * wobble;
+      }
+
+      if (frameCount % 2 === 0) sieve(t);
+      drawWitnesses();
+      drawNodes(t);
+      drawCompass(t);
+    }
+
+    function sieve(t) {
+      const attempts = min(160, floor(nodes.length * 0.38));
+      for (let k = 0; k < attempts; k++) {
+        const a = nodes[floor(random(nodes.length))];
+        const gap = primes[(a.gx + a.gy + t + k) % primes.length];
+        const dx = ((k + a.salt) % 3) - 1;
+        const dy = (((k * 2 + a.salt) % 3) - 1) || 1;
+        const bx = a.gx + dx * gap;
+        const by = a.gy + dy * gap;
+        const b = nodes.find(n => n.gx === bx && n.gy === by);
+        if (!b) continue;
+
+        let score = 0;
+        let lastPrime = 0;
+        for (const p of primes) {
+          const now = (a.salt + b.id + t) % p;
+          const then = (b.salt + a.id + t - gap * p) % p;
+          const folded = (a.gx * b.gy + b.gx * a.gy + gap) % p;
+          if (now === then || now === folded) {
+            score++;
+            lastPrime = p;
+          }
+        }
+
+        if (score >= 2) {
+          a.charge = min(1, a.charge + score * 0.09);
+          b.charge = min(1, b.charge + score * 0.09);
+          witnesses.push({
+            ax: a.sx, ay: a.sy, bx: b.sx, by: b.sy,
+            mx: (a.sx + b.sx) * 0.5,
+            my: (a.sy + b.sy) * 0.5,
+            score,
+            p: lastPrime,
+            life: 110 + score * 28,
+            max: 110 + score * 28,
+            hue: 186 + score * 18 + lastPrime * 2,
+            glyph: glyphs[(lastPrime + score + t) % glyphs.length]
+          });
+        }
+      }
+      if (witnesses.length > 620) witnesses.splice(0, witnesses.length - 620);
+    }
+
+    function drawWitnesses() {
+      blendMode(ADD);
+      for (let i = witnesses.length - 1; i >= 0; i--) {
+        const w = witnesses[i];
+        const a = w.life / w.max;
+        w.life -= 1;
+        if (w.life <= 0) {
+          witnesses.splice(i, 1);
+          continue;
+        }
+
+        const bow = sin(a * PI) * 34 * (w.score - 1);
+        const vx = w.bx - w.ax;
+        const vy = w.by - w.ay;
+        const len = max(1, sqrt(vx * vx + vy * vy));
+        const nx = -vy / len;
+        const ny = vx / len;
+
+        noFill();
+        stroke(w.hue % 360, 68, 78, 18 + a * 86);
+        strokeWeight(0.45 + w.score * 0.38);
+        bezier(w.ax, w.ay, w.mx + nx * bow, w.my + ny * bow, w.mx - nx * bow, w.my - ny * bow, w.bx, w.by);
+
+        if (w.score >= 3 && frameCount % 3 === 0) {
+          fill((w.hue + 24) % 360, 50, 96, 36 + a * 78);
+          noStroke();
+          textSize(10 + w.score);
+          text(w.glyph, w.mx + nx * bow * 0.45, w.my + ny * bow * 0.45);
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawNodes(t) {
+      noStroke();
+      for (const n of nodes) {
+        const pulse = ((n.salt + t) % n.p) === 0 ? 1 : 0;
+        const r = 1.2 + n.charge * 5 + pulse * 2.2;
+        const hue = 206 + n.p * 4 + n.charge * 42;
+        fill(hue % 360, 50 + n.charge * 35, 38 + n.charge * 56, 38 + n.charge * 142);
+        circle(n.sx, n.sy, r);
+      }
+    }
+
+    function drawCompass(t) {
+      const cx = width - 92;
+      const cy = 74;
+      noFill();
+      stroke(205, 42, 72, 80);
+      strokeWeight(1);
+      circle(cx, cy, 46);
+      for (let i = 0; i < primes.length; i++) {
+        const p = primes[i];
+        const a = -HALF_PI + TAU * ((t % p) / p) + i * 0.018;
+        stroke(180 + i * 18, 56, 88, 72);
+        line(cx, cy, cx + cos(a) * (15 + i * 3), cy + sin(a) * (15 + i * 3));
+      }
+      noStroke();
+      fill(220, 28, 88, 96);
+      textSize(11);
+      textAlign(CENTER, CENTER);
+      text('sieve', cx, cy + 42);
+      textAlign(LEFT, BASELINE);
+    }
+
+    function mousePressed() {
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+  </script>
+</body>
+</html>
