@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '007-shadow-grammar', title: 'shadow grammar', date: '2026-05-20' },
   { id: '006-interval-sieve', title: 'interval sieve', date: '2026-05-19' },
   { id: '005-residue-choir', title: 'residue choir', date: '2026-05-18' },
   { id: '004-prime-weather', title: 'prime weather', date: '2026-05-17' },

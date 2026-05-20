@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>shadow grammar</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #03050a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      color: rgba(218, 230, 255, 0.58);
+      font-size: 12px;
+      letter-spacing: 0.045em;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 18px rgba(142, 190, 255, 0.24);
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">shadow grammar · glyphs appear where two incompatible grammars predict the same next trace</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const glyphs = ['·', '∴', '∵', '∷', '⁙', '⊕', '⊗', '⊚', '⟡', '⌁'];
+    const palette = [198, 214, 238, 265, 292, 326, 38, 74];
+    let cols, rows, cell, field, nextField, ink, seed;
+    let grammars = [];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      cell = constrain(floor(min(width, height) / 32), 15, 28);
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+      field = new Array(cols * rows);
+      nextField = new Array(cols * rows);
+      ink = new Array(cols * rows).fill(0).map(() => ({ a: 0, h: 210, g: '·', age: 0, tension: 0 }));
+
+      // Two rulebooks are generated from the same seed but folded differently.
+      // A mark is permitted only when both rulebooks infer the same future from
+      // the local shadow. The drawing is the residue of accidental agreement.
+      grammars = [makeGrammar(3), makeGrammar(11)];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = noise(x * 0.13, y * 0.13, seed * 0.00001);
+          const ridge = abs(sin((x * 5 + y * 8 + seed % 97) * 0.073));
+          field[idx(x, y)] = (n * 1.6 + ridge * 0.55 + random(0.18)) % 1 > 0.78 ? 1 : 0;
+        }
+      }
+      background(224, 58, 3);
+    }
+
+    function makeGrammar(offset) {
+      const table = [];
+      for (let i = 0; i < 512; i++) {
+        const bits = bitCount(i);
+        const folded = (i * (17 + offset) + bits * bits * (5 + offset) + seed) >>> 0;
+        table[i] = (folded ^ (folded >>> (offset % 7 + 3))) % 9 < (bits === 4 || bits === 5 ? 5 : 3) ? 1 : 0;
+      }
+      return table;
+    }
+
+    function draw() {
+      background(224, 58, 3, 34);
+      if (frameCount % 2 === 0) stepGrammar();
+      drawVeil();
+      drawInk();
+      drawRuleDial();
+    }
+
+    function stepGrammar() {
+      const driftX = floor(frameCount / 37) % cols;
+      const driftY = floor(frameCount / 53) % rows;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = idx(x, y);
+          const codeA = neighborhoodCode(x, y, 0, 0);
+          const codeB = neighborhoodCode(x + driftX, y + driftY, 1, -1);
+          const a = grammars[0][codeA];
+          const b = grammars[1][codeB];
+          const old = field[here];
+          const salt = (x * 31 + y * 47 + frameCount + seed) % 19;
+          const mutation = noise(x * 0.045, y * 0.045, frameCount * 0.018) > 0.835 && salt === 0;
+          nextField[here] = mutation ? 1 - old : (a ^ (old && !b ? 1 : 0));
+
+          if (a === b && a !== old) {
+            const w = ink[here];
+            const tension = bitCount(codeA ^ codeB);
+            w.a = min(255, w.a + 70 + tension * 10);
+            w.h = palette[(tension + x + y + floor(frameCount / 9)) % palette.length];
+            w.g = glyphs[(codeA + codeB + tension + frameCount) % glyphs.length];
+            w.age = 0;
+            w.tension = tension;
+          }
+        }
+      }
+      const tmp = field;
+      field = nextField;
+      nextField = tmp;
+    }
+
+    function neighborhoodCode(x, y, ox, oy) {
+      let code = 0;
+      let bit = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = wrap(x + dx + ox, cols);
+          const yy = wrap(y + dy + oy, rows);
+          code |= field[idx(xx, yy)] << bit;
+          bit++;
+        }
+      }
+      return code;
+    }
+
+    function drawVeil() {
+      blendMode(ADD);
+      noFill();
+      strokeWeight(1);
+      const t = frameCount * 0.012;
+      for (let k = 0; k < 18; k++) {
+        const y = (height * noise(k * 0.17, t) + k * height / 18) % height;
+        const h = 192 + k * 7;
+        stroke(h % 360, 40, 70, 10);
+        beginShape();
+        for (let x = -40; x <= width + 40; x += 28) {
+          const yy = y + (noise(x * 0.006, k * 0.3, t) - 0.5) * 92;
+          curveVertex(x, yy);
+        }
+        endShape();
+      }
+      blendMode(BLEND);
+    }
+
+    function drawInk() {
+      textAlign(CENTER, CENTER);
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = idx(x, y);
+          const w = ink[i];
+          w.a *= 0.946;
+          w.age++;
+          if (w.a < 3) continue;
+
+          const px = (x - 0.5) * cell + sin((w.age + x * 3) * 0.07) * 2.2;
+          const py = (y - 0.5) * cell + cos((w.age + y * 5) * 0.061) * 2.2;
+          const s = 8 + min(15, w.tension * 1.5) + sin(w.age * 0.12) * 1.8;
+
+          blendMode(ADD);
+          noStroke();
+          fill(w.h, 70, 88, w.a * 0.16);
+          circle(px, py, cell * (0.6 + w.tension * 0.055));
+          fill((w.h + 24) % 360, 34, 96, w.a * 0.62);
+          textSize(s);
+          text(w.g, px, py);
+          blendMode(BLEND);
+        }
+      }
+    }
+
+    function drawRuleDial() {
+      const cx = width - 78;
+      const cy = 72;
+      const r = 35;
+      noFill();
+      stroke(218, 28, 78, 74);
+      strokeWeight(1);
+      circle(cx, cy, r * 2);
+      for (let i = 0; i < 9; i++) {
+        const sample = grammars[0][(i * 57 + frameCount) % 512] === grammars[1][(i * 91 + frameCount) % 512];
+        const a = -HALF_PI + TAU * i / 9 + frameCount * 0.006;
+        stroke(sample ? 188 : 320, sample ? 58 : 46, 88, sample ? 120 : 54);
+        line(cx + cos(a) * 8, cy + sin(a) * 8, cx + cos(a) * r, cy + sin(a) * r);
+      }
+      noStroke();
+      fill(220, 24, 90, 92);
+      textSize(11);
+      textAlign(CENTER, CENTER);
+      text('agree', cx, cy + 48);
+      textAlign(LEFT, BASELINE);
+    }
+
+    function idx(x, y) { return x + y * cols; }
+    function wrap(v, max) { return ((v % max) + max) % max; }
+    function bitCount(n) {
+      let c = 0;
+      while (n) { n &= n - 1; c++; }
+      return c;
+    }
+
+    function mousePressed() {
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+  </script>
+</body>
+</html>
