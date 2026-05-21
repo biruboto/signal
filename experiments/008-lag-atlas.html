@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lag atlas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #03040a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      color: rgba(218, 232, 255, 0.58);
+      font-size: 12px;
+      letter-spacing: 0.045em;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 18px rgba(118, 184, 255, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">lag atlas · each cell asks which delayed version of itself best predicts the next shore</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    let seed, cell, cols, rows, field, nextField, trace, histories, glyphs;
+    const maxLag = 11;
+    const signs = ['·', '∿', '≋', '⌁', '⟲', '◌', '◍', '⊙', '✶', '∴'];
+    const hues = [188, 202, 218, 236, 258, 286, 318, 36, 52];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      cell = constrain(floor(min(width, height) / 38), 12, 24);
+      cols = ceil(width / cell) + 4;
+      rows = ceil(height / cell) + 4;
+      field = new Float32Array(cols * rows);
+      nextField = new Float32Array(cols * rows);
+      trace = new Array(cols * rows).fill(0).map(() => ({ a: 0, h: 210, g: '·', lag: 0, spin: 0 }));
+      histories = Array.from({ length: maxLag }, () => new Float32Array(cols * rows));
+      glyphs = [];
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const r = sqrt(sq(x - cols * 0.5) + sq(y - rows * 0.5));
+          const tide = sin(r * 0.44 + noise(x * 0.09, y * 0.09) * 7.0);
+          const seam = sin((x * 13 + y * 21 + seed % 101) * 0.031);
+          field[idx(x, y)] = tide * 0.62 + seam * 0.25 + random(-0.18, 0.18);
+        }
+      }
+      for (let h of histories) h.set(field);
+      background(226, 68, 3);
+    }
+
+    function draw() {
+      background(226, 68, 3, 31);
+      if (frameCount % 2 === 0) stepLagField();
+      drawMemoryCurrents();
+      drawCells();
+      drawGlyphs();
+      drawLagCompass();
+    }
+
+    function stepLagField() {
+      histories.pop();
+      histories.unshift(new Float32Array(field));
+
+      const phase = frameCount * 0.017;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const here = field[i];
+          const lap = avgNeighbors(x, y) - here;
+          const wind = noise(x * 0.055 + phase, y * 0.055 - phase, seed * 0.00001) - 0.5;
+          let bestLag = 1;
+          let bestErr = 999;
+
+          // The atlas searches its own delayed copies. A cell changes according
+          // to the past displacement that is least wrong about its neighborhood.
+          for (let lag = 1; lag < maxLag; lag++) {
+            const dx = ((lag * 3 + floor(frameCount / 23)) % 7) - 3;
+            const dy = ((lag * 5 + floor(frameCount / 31)) % 7) - 3;
+            const past = sampleHistory(lag, x + dx, y + dy);
+            const err = abs(past - here) + abs(past - avgNeighbors(x + dy, y - dx)) * 0.55;
+            if (err < bestErr) {
+              bestErr = err;
+              bestLag = lag;
+            }
+          }
+
+          const delayed = sampleHistory(bestLag, x - bestLag % 4 + 1, y + (bestLag * 2) % 5 - 2);
+          const shore = abs(here) < 0.09 || abs(delayed - here) < 0.038;
+          nextField[i] = constrain(here + lap * 0.48 - delayed * 0.045 + wind * 0.18, -1, 1);
+
+          if (shore && bestErr < 0.19) {
+            const mark = trace[i];
+            mark.a = min(255, mark.a + 46 + (maxLag - bestLag) * 8);
+            mark.h = hues[(bestLag + x + y + floor(frameCount / 8)) % hues.length];
+            mark.g = signs[(bestLag + floor(abs(lap) * 40) + i) % signs.length];
+            mark.lag = bestLag;
+            mark.spin = lap;
+            if (frameCount % 6 === 0 && glyphs.length < 90) {
+              glyphs.push({ x: (x - 1.5) * cell, y: (y - 1.5) * cell, a: 160, h: mark.h, g: mark.g, s: random(-0.018, 0.018) });
+            }
+          }
+        }
+      }
+      const tmp = field;
+      field = nextField;
+      nextField = tmp;
+    }
+
+    function avgNeighbors(x, y) {
+      return (
+        sample(field, x - 1, y) + sample(field, x + 1, y) +
+        sample(field, x, y - 1) + sample(field, x, y + 1) +
+        sample(field, x - 1, y - 1) * 0.5 + sample(field, x + 1, y + 1) * 0.5
+      ) / 5;
+    }
+
+    function sampleHistory(lag, x, y) {
+      return sample(histories[constrain(lag, 0, histories.length - 1)], x, y);
+    }
+
+    function sample(arr, x, y) {
+      x = (floor(x) % cols + cols) % cols;
+      y = (floor(y) % rows + rows) % rows;
+      return arr[idx(x, y)];
+    }
+
+    function idx(x, y) {
+      return ((y % rows + rows) % rows) * cols + ((x % cols + cols) % cols);
+    }
+
+    function drawMemoryCurrents() {
+      noFill();
+      strokeWeight(1);
+      for (let y = 2; y < rows - 2; y += 3) {
+        beginShape();
+        for (let x = 1; x < cols - 1; x++) {
+          const i = idx(x, y);
+          const v = field[i];
+          const lag = trace[i].lag || 1;
+          stroke((205 + lag * 9) % 360, 42, 62, 18 + abs(v) * 28);
+          const px = (x - 1.5) * cell;
+          const py = (y - 1.5) * cell + sin(v * 3 + frameCount * 0.025 + x * 0.13) * cell * 0.42;
+          curveVertex(px, py);
+        }
+        endShape();
+      }
+    }
+
+    function drawCells() {
+      textAlign(CENTER, CENTER);
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = idx(x, y);
+          const mark = trace[i];
+          if (mark.a <= 2) continue;
+          const px = (x - 1.5) * cell;
+          const py = (y - 1.5) * cell;
+          const r = map(mark.lag, 1, maxLag - 1, cell * 0.16, cell * 0.58);
+          stroke(mark.h, 58, 84, mark.a * 0.48);
+          strokeWeight(1);
+          noFill();
+          ellipse(px, py, r * 2.0, r * (1.0 + abs(mark.spin) * 2.6));
+          fill(mark.h, 40, 93, mark.a * 0.86);
+          noStroke();
+          textSize(cell * 0.64);
+          text(mark.g, px, py + sin(frameCount * 0.02 + mark.lag) * 1.3);
+          mark.a *= 0.936;
+        }
+      }
+    }
+
+    function drawGlyphs() {
+      textAlign(CENTER, CENTER);
+      for (let k = glyphs.length - 1; k >= 0; k--) {
+        const p = glyphs[k];
+        p.y -= 0.08 + p.s * 5;
+        p.x += sin(frameCount * 0.018 + p.y * 0.01) * 0.18;
+        p.a *= 0.982;
+        fill(p.h, 30, 98, p.a);
+        noStroke();
+        textSize(10 + p.a * 0.035);
+        text(p.g, p.x, p.y);
+        if (p.a < 6) glyphs.splice(k, 1);
+      }
+    }
+
+    function drawLagCompass() {
+      const cx = width - 66;
+      const cy = height - 62;
+      noFill();
+      strokeWeight(1);
+      for (let lag = 1; lag < maxLag; lag++) {
+        const a = frameCount * 0.006 + lag * TAU / (maxLag - 1);
+        const r = 12 + lag * 3.2;
+        stroke(hues[lag % hues.length], 45, 78, 32);
+        arc(cx, cy, r * 2, r * 2, a, a + PI * 0.22);
+      }
+      noStroke();
+      fill(210, 24, 82, 120);
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      text('lag', cx, cy);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      seed = floor(random(1e9));
+      rebuild();
+    }
+  </script>
+</body>
+</html>
