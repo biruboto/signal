@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '009-free-room', title: 'free room', date: '2026-05-22' },
   { id: '008-lag-atlas', title: 'lag atlas', date: '2026-05-21' },
   { id: '007-shadow-grammar', title: 'shadow grammar', date: '2026-05-20' },
   { id: '006-interval-sieve', title: 'interval sieve', date: '2026-05-19' },
