@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>alias loom</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #04050a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: rgba(226, 232, 218, 0.72);
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(780px, calc(100vw - 36px));
+      color: rgba(224, 234, 212, 0.58);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.04em;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 20px rgba(156, 232, 181, 0.20);
+    }
+    .readout {
+      position: fixed;
+      right: 18px;
+      top: 16px;
+      color: rgba(162, 218, 255, 0.50);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      user-select: none;
+      pointer-events: none;
+      text-align: right;
+      line-height: 1.55;
+      text-shadow: 0 0 18px rgba(93, 184, 255, 0.22);
+    }
+  </style>
+</head>
+<body>
+  <div class="readout" id="readout">ALIAS LOOM</div>
+  <div class="caption">alias loom · rows are hashed into small names · when different structures share an alias, the loom ties them together</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    p5.disableFriendlyErrors = true;
+
+    const GLYPHS = ['·', '∴', '⌁', '∿', '◌', '⊙', '◇', '✶', '⟡', '⊚', '⧖', '≋'];
+    const SYLLABLES = ['ka', 'lo', 'mir', 'sen', 'tu', 'av', 'chi', 'no', 'iel', 'zor', 'pha', 'um', 'ri', 'ves', 'oth', 'ya'];
+    let seed, cell, cols, rows, state, nextState, aliasRows, collisions, sparks, tick, readout;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      readout = document.getElementById('readout');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      tick = 0;
+      cell = constrain(floor(min(width, height) / 46), 10, 18);
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+      state = new Uint8Array(cols * rows);
+      nextState = new Uint8Array(cols * rows);
+      aliasRows = [];
+      collisions = [];
+      sparks = [];
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const ridge = noise(x * 0.055, y * 0.055) + sin((x * 7 + y * 11 + seed % 97) * 0.071) * 0.24;
+          const shell = sin(dist(x, y, cols * 0.5, rows * 0.5) * 0.42 + noise(x * 0.12, y * 0.12) * 5.0);
+          state[idx(x, y)] = ridge + shell * 0.18 > 0.55 ? 1 : 0;
+        }
+      }
+      background(222, 72, 3);
+      computeAliases();
+    }
+
+    function draw() {
+      tick++;
+      background(222, 72, 3, 28);
+      if (tick % 3 === 0) {
+        stepAutomaton();
+        computeAliases();
+      }
+      drawAliasThreads();
+      drawCells();
+      drawSparks();
+      drawMarginNames();
+      if (tick % 17 === 0) readout.textContent = `ALIAS LOOM\nSEED ${seed.toString(16)}\nCOLLISIONS ${collisions.length}`;
+    }
+
+    function stepAutomaton() {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const n = countNeighbors(x, y);
+          const bit = state[i];
+          const bias = noise(x * 0.04, y * 0.04, tick * 0.01) > 0.64 ? 1 : 0;
+          const river = ((x * 3 + y * 5 + floor(tick / 9) + seed) % 29) === 0;
+          nextState[i] = (bit && (n === 2 || n === 3 || (bias && n === 1))) || (!bit && (n === 3 || (river && n === 2))) ? 1 : 0;
+        }
+      }
+      const tmp = state;
+      state = nextState;
+      nextState = tmp;
+    }
+
+    function countNeighbors(x, y) {
+      let n = 0;
+      for (let yy = -1; yy <= 1; yy++) {
+        for (let xx = -1; xx <= 1; xx++) {
+          if (xx === 0 && yy === 0) continue;
+          n += state[idx(x + xx, y + yy)];
+        }
+      }
+      return n;
+    }
+
+    function computeAliases() {
+      aliasRows = [];
+      const buckets = new Map();
+      for (let y = 1; y < rows - 1; y++) {
+        let hash = 2166136261;
+        let mass = 0;
+        let center = 0;
+        for (let x = 1; x < cols - 1; x++) {
+          const bit = state[idx(x, y)];
+          mass += bit;
+          center += bit * x;
+          hash ^= bit ? (x * 374761393 + y * 668265263 + tick) : (x * 1274126177);
+          hash = Math.imul(hash, 16777619) >>> 0;
+        }
+        center = mass ? center / mass : cols * 0.5;
+        // Deliberately compress the address: the loom is interested in aliases,
+        // not identities. Different rows are forced to share small names.
+        const folded = (hash ^ (hash >>> 11) ^ (mass * 131)) & 255;
+        const name = nameFor(folded);
+        const row = { y, hash: folded, name, mass, center, hue: (164 + folded * 1.23 + mass * 2.5) % 360 };
+        aliasRows.push(row);
+        if (!buckets.has(name)) buckets.set(name, []);
+        buckets.get(name).push(row);
+      }
+
+      collisions = [];
+      for (const group of buckets.values()) {
+        if (group.length < 2) continue;
+        for (let i = 0; i < group.length - 1; i++) {
+          const a = group[i];
+          const b = group[i + 1];
+          if (abs(a.y - b.y) > 2) {
+            collisions.push({ a, b, age: 0, hue: (a.hue + b.hue) * 0.5 });
+            if (sparks.length < 90 && random() < 0.23) {
+              sparks.push({
+                x: ((a.center + b.center) * 0.5 - 1) * cell,
+                y: ((a.y + b.y) * 0.5 - 1) * cell,
+                name: a.name,
+                hue: (a.hue + b.hue) * 0.5,
+                age: 0,
+                ttl: random(80, 190),
+                drift: random(-0.18, 0.18)
+              });
+            }
+          }
+        }
+      }
+    }
+
+    function nameFor(v) {
+      const a = SYLLABLES[v & 15];
+      const b = SYLLABLES[(v >> 4) & 15];
+      return `${a}-${b}`;
+    }
+
+    function drawCells() {
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(cell * 0.62);
+      for (let y = 1; y < rows - 1; y++) {
+        const row = aliasRows[y - 1];
+        for (let x = 1; x < cols - 1; x++) {
+          const bit = state[idx(x, y)];
+          const px = (x - 1) * cell + cell * 0.5;
+          const py = (y - 1) * cell + cell * 0.5;
+          const grain = noise(x * 0.18, y * 0.18, tick * 0.016);
+          if (bit) {
+            const lit = 48 + grain * 34;
+            fill(row.hue, 50 + grain * 28, lit, 95);
+            rect(px - cell * 0.36, py - cell * 0.36, cell * 0.72, cell * 0.72, cell * 0.16);
+            if ((x + y + tick) % 7 === 0) {
+              fill((row.hue + 34) % 360, 34, 96, 84);
+              text(GLYPHS[(x * 5 + y * 3 + row.hash) % GLYPHS.length], px, py + 0.5);
+            }
+          } else if (grain > 0.74) {
+            fill(row.hue, 24, 42, 22);
+            circle(px, py, cell * 0.18);
+          }
+        }
+      }
+    }
+
+    function drawAliasThreads() {
+      blendMode(ADD);
+      noFill();
+      for (const c of collisions) {
+        const ax = (c.a.center - 1) * cell;
+        const ay = (c.a.y - 1) * cell;
+        const bx = (c.b.center - 1) * cell;
+        const by = (c.b.y - 1) * cell;
+        const strength = constrain((c.a.mass + c.b.mass) / (cols * 0.42), 0.12, 1);
+        const pulse = sin(tick * 0.04 + c.a.hash) * 0.5 + 0.5;
+        stroke(c.hue, 56, 86, 14 + strength * 42 + pulse * 16);
+        strokeWeight(0.65 + strength * 1.4);
+        beginShape();
+        vertex(ax, ay);
+        const midY = (ay + by) * 0.5;
+        const bend = sin((c.a.hash + tick) * 0.03) * width * 0.05;
+        bezierVertex(ax + bend, midY, bx - bend, midY, bx, by);
+        endShape();
+      }
+      blendMode(BLEND);
+    }
+
+    function drawMarginNames() {
+      textAlign(LEFT, CENTER);
+      textSize(10);
+      for (let i = 0; i < aliasRows.length; i += 2) {
+        const r = aliasRows[i];
+        const alpha = 24 + constrain(r.mass / cols, 0, 1) * 70;
+        fill(r.hue, 36, 82, alpha);
+        text(r.name, 12, (r.y - 1) * cell + cell * 0.5);
+      }
+    }
+
+    function drawSparks() {
+      textAlign(CENTER, CENTER);
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.age++;
+        s.y -= 0.16;
+        s.x += s.drift + sin((tick + s.age) * 0.03) * 0.05;
+        const a = 1 - s.age / s.ttl;
+        if (a <= 0) {
+          sparks.splice(i, 1);
+          continue;
+        }
+        fill(s.hue, 42, 96, a * 130);
+        textSize(10 + (1 - a) * 3);
+        text(s.name, s.x, s.y);
+      }
+    }
+
+    function idx(x, y) {
+      x = (floor(x) % cols + cols) % cols;
+      y = (floor(y) % rows + rows) % rows;
+      return y * cols + x;
+    }
+
+    function mousePressed() {
+      const gx = floor(mouseX / cell) + 1;
+      const gy = floor(mouseY / cell) + 1;
+      for (let y = -4; y <= 4; y++) {
+        for (let x = -4; x <= 4; x++) {
+          if (x * x + y * y < 18) state[idx(gx + x, gy + y)] ^= 1;
+        }
+      }
+      computeAliases();
+    }
+
+    function keyPressed() {
+      if (key === 'r' || key === 'R') {
+        seed = floor(random(1e9));
+        rebuild();
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+  </script>
+</body>
+</html>
