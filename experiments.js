@@ -17,11 +17,13 @@ const list = document.getElementById('experiment-list');
 if (experiments.length === 0) {
   list.innerHTML = '<li class="empty">nothing here yet — check back tomorrow</li>';
 } else {
-  experiments.forEach(exp => {
+  experiments.forEach((exp, index) => {
     const li = document.createElement('li');
+    const latestBadge = index === 0 ? '<span class="experiment-badge">latest</span>' : '';
+    if (index === 0) li.classList.add('is-latest');
     li.innerHTML = `
       <a href="experiments/${exp.id}.html">
-        <span class="experiment-title">${exp.title}</span>
+        <span class="experiment-title">${exp.title}${latestBadge}</span>
         <span class="experiment-date">${exp.date}</span>
       </a>
     `;
