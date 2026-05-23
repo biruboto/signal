@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>return sieve</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #03050a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: rgba(226, 236, 220, 0.72);
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(790px, calc(100vw - 36px));
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.04em;
+      color: rgba(226, 236, 220, 0.56);
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 0 20px rgba(132, 225, 197, 0.18);
+    }
+    .readout {
+      position: fixed;
+      top: 16px;
+      right: 18px;
+      text-align: right;
+      white-space: pre;
+      font-size: 11px;
+      line-height: 1.55;
+      letter-spacing: 0.12em;
+      color: rgba(155, 211, 255, 0.50);
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 0 18px rgba(88, 186, 255, 0.20);
+    }
+  </style>
+</head>
+<body>
+  <div class="readout" id="readout">RETURN SIEVE</div>
+  <div class="caption">return sieve · many walkers try modular orbits · only positions whose return-time fits the current aperture are allowed to glow</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    p5.disableFriendlyErrors = true;
+
+    const PRIMES = [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41];
+    const MARKS = ['·', '∶', '∷', '⋮', '⌁', '∿', '⊙', '◌', '◇', '⟡', '⧖', '≋'];
+    let seed, walkers, traces, tick, readout, aperture, basinCount, gridStep;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      readout = document.getElementById('readout');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      tick = 0;
+      traces = [];
+      walkers = [];
+      aperture = 1;
+      basinCount = 0;
+      gridStep = constrain(floor(min(width, height) / 30), 18, 34);
+      const count = floor(constrain((width * height) / 9800, 80, 190));
+
+      for (let i = 0; i < count; i++) {
+        const modulus = PRIMES[(i + seed) % PRIMES.length] * PRIMES[(i * 5 + 3) % PRIMES.length];
+        const a = 1 + (floor(random(modulus - 2)) | 1);
+        const b = floor(random(modulus));
+        const x0 = floor(random(modulus));
+        const y0 = floor(random(modulus));
+        const orbit = returnTime(x0, y0, a, b, modulus);
+        const lane = (i + orbit + seed) % 9;
+        walkers.push({
+          x: x0,
+          y: y0,
+          a,
+          b,
+          modulus,
+          orbit,
+          lane,
+          hue: (154 + orbit * 7 + lane * 19 + random(-14, 14)) % 360,
+          phase: random(TAU),
+          drift: random(-0.45, 0.45)
+        });
+      }
+      background(220, 70, 3);
+    }
+
+    function draw() {
+      tick++;
+      aperture = 1 + ((floor(tick / 46) + (seed % 17)) % 23);
+      background(220, 70, 3, 20);
+      drawLattice();
+      basinCount = 0;
+
+      const steps = 2 + (tick % 3 === 0 ? 1 : 0);
+      for (let s = 0; s < steps; s++) {
+        for (const w of walkers) advanceWalker(w);
+      }
+
+      drawTraces();
+      drawApertureRing();
+      if (tick % 19 === 0) {
+        readout.textContent = `RETURN SIEVE\nSEED ${seed.toString(16)}\nAPERTURE ${aperture}\nVISIBLE ${basinCount}`;
+      }
+    }
+
+    function advanceWalker(w) {
+      const oldX = w.x;
+      const oldY = w.y;
+      w.x = (Math.imul(w.a, w.x) + w.y + w.b) % w.modulus;
+      w.y = (Math.imul(w.a + 2, w.y) + oldX + w.b + w.lane) % w.modulus;
+
+      // The sieve deliberately misreads recurrence: exact divisibility, near misses,
+      // and periodic false alarms all count as structural weather.
+      const near = abs((w.orbit % aperture) - aperture * 0.5) < 1.15;
+      const admitted = (w.orbit % aperture === 0) || near || ((tick + w.orbit + w.lane) % (aperture + 7) === 0);
+      if (!admitted) return;
+
+      basinCount++;
+      const nx = w.x / w.modulus;
+      const ny = w.y / w.modulus;
+      const fold = noise(nx * 3.2 + w.lane, ny * 3.2, tick * 0.004);
+      const theta = w.phase + tick * 0.006 * (w.lane + 1) + fold * TAU;
+      const radius = min(width, height) * (0.08 + 0.42 * fold);
+      const cx = width * (0.5 + 0.10 * sin(tick * 0.003 + w.lane));
+      const cy = height * (0.5 + 0.08 * cos(tick * 0.004 + w.lane * 0.7));
+      const px = lerp(nx * width, cx + cos(theta) * radius, 0.38 + 0.20 * sin(w.orbit));
+      const py = lerp(ny * height, cy + sin(theta * 1.17) * radius, 0.38 + 0.20 * cos(w.orbit));
+
+      traces.push({
+        x: px,
+        y: py,
+        ox: map(oldX, 0, w.modulus, 0, width),
+        oy: map(oldY, 0, w.modulus, 0, height),
+        hue: (w.hue + aperture * 3 + fold * 34) % 360,
+        age: 0,
+        ttl: random(70, 170),
+        mark: MARKS[(w.orbit + w.lane + tick) % MARKS.length],
+        weight: 0.55 + min(2.2, w.orbit / 38)
+      });
+      if (traces.length > 850) traces.splice(0, traces.length - 850);
+    }
+
+    function returnTime(x0, y0, a, b, m) {
+      let x = x0;
+      let y = y0;
+      const cap = min(480, m * 2);
+      for (let t = 1; t <= cap; t++) {
+        const oldX = x;
+        x = (Math.imul(a, x) + y + b) % m;
+        y = (Math.imul(a + 2, y) + oldX + b + (t % 9)) % m;
+        if (x === x0 && y === y0) return t;
+      }
+      return cap + ((x0 * 13 + y0 * 7 + a) % 31);
+    }
+
+    function drawLattice() {
+      strokeWeight(1);
+      for (let x = (tick * 0.09) % gridStep; x < width; x += gridStep) {
+        const n = noise(x * 0.006, tick * 0.006);
+        stroke(190 + n * 60, 34, 30, 8 + n * 14);
+        line(x, 0, x + sin(tick * 0.004 + x * 0.02) * 12, height);
+      }
+      for (let y = (tick * 0.07) % gridStep; y < height; y += gridStep) {
+        const n = noise(y * 0.006, 19, tick * 0.006);
+        stroke(192 + n * 54, 28, 30, 7 + n * 12);
+        line(0, y, width, y + cos(tick * 0.004 + y * 0.02) * 12);
+      }
+    }
+
+    function drawTraces() {
+      blendMode(ADD);
+      textAlign(CENTER, CENTER);
+      for (let i = traces.length - 1; i >= 0; i--) {
+        const t = traces[i];
+        t.age++;
+        const life = 1 - t.age / t.ttl;
+        if (life <= 0) {
+          traces.splice(i, 1);
+          continue;
+        }
+        const shimmer = noise(t.x * 0.006, t.y * 0.006, tick * 0.014);
+        stroke(t.hue, 52, 88, 18 * life);
+        strokeWeight(t.weight * life);
+        line(t.ox, t.oy, t.x, t.y);
+        noStroke();
+        fill(t.hue, 54, 92, (45 + shimmer * 90) * life);
+        circle(t.x, t.y, (2.5 + t.weight * 3 + shimmer * 5) * life);
+        if (life > 0.48 && shimmer > 0.62) {
+          fill((t.hue + 38) % 360, 28, 98, 80 * life);
+          textSize(9 + t.weight * 2);
+          text(t.mark, t.x + sin(t.age * 0.07) * 7, t.y - 10);
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawApertureRing() {
+      const pulse = sin(tick * 0.035) * 0.5 + 0.5;
+      const r = min(width, height) * (0.13 + (aperture % 13) * 0.017 + pulse * 0.01);
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      noFill();
+      stroke(176 + aperture * 4, 44, 86, 32);
+      strokeWeight(1.2);
+      circle(cx, cy, r * 2);
+
+      noStroke();
+      fill(176 + aperture * 4, 24, 82, 46);
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      for (let i = 0; i < aperture; i++) {
+        const a = (i / aperture) * TAU + tick * 0.004;
+        const mark = MARKS[(i + aperture) % MARKS.length];
+        text(mark, cx + cos(a) * r, cy + sin(a) * r);
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      seed = floor(random(1e9));
+      rebuild();
+    }
+  </script>
+</body>
+</html>
