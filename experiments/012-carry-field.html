@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>carry field</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #05060a;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: rgba(230, 237, 222, 0.72);
+    }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(820px, calc(100vw - 36px));
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.04em;
+      color: rgba(230, 237, 222, 0.57);
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 0 18px rgba(188, 230, 190, 0.16);
+    }
+    .readout {
+      position: fixed;
+      top: 16px;
+      right: 18px;
+      text-align: right;
+      white-space: pre;
+      font-size: 11px;
+      line-height: 1.55;
+      letter-spacing: 0.12em;
+      color: rgba(164, 211, 255, 0.54);
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 0 18px rgba(84, 164, 255, 0.22);
+    }
+  </style>
+</head>
+<body>
+  <div class="readout" id="readout">CARRY FIELD</div>
+  <div class="caption">carry field · a grid keeps adding itself incorrectly · the excess digits travel as weather, and the remainders learn where to glow</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    p5.disableFriendlyErrors = true;
+
+    const RADICES = [5, 7, 8, 9, 11, 13];
+    const GLYPHS = ['0','1','2','3','4','5','6','7','8','9','a','b','c'];
+    let cols, rows, cell, grid, nextGrid, carries, tick, seed, readout, radix, pulseCount;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      readout = document.getElementById('readout');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed);
+      noiseSeed(seed);
+      tick = 0;
+      pulseCount = 0;
+      radix = RADICES[seed % RADICES.length];
+      cell = constrain(floor(min(width, height) / 34), 13, 24);
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+      grid = makeField();
+      nextGrid = makeField(0);
+      carries = [];
+      background(226, 58, 3);
+    }
+
+    function makeField(fillValue) {
+      const field = new Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          if (fillValue !== undefined) {
+            field[i] = fillValue;
+            continue;
+          }
+          const basin = noise(x * 0.08, y * 0.08, seed * 0.00001);
+          const vein = (x * 3 + y * 5 + floor(basin * 17) + seed) % radix;
+          field[i] = (vein + floor(random(radix))) % radix;
+        }
+      }
+      return field;
+    }
+
+    function draw() {
+      tick++;
+      background(226, 58, 3, 30);
+      pulseCount = 0;
+      stepArithmetic();
+      drawRemainders();
+      drawCarries();
+      drawChecksumRing();
+      if (tick % 17 === 0) {
+        const sum = checksum();
+        readout.textContent = `CARRY FIELD\nSEED ${seed.toString(16)}\nRADIX ${radix}\nCARRIES ${pulseCount}\nCHECK ${sum.toString(radix).toUpperCase()}`;
+      }
+    }
+
+    function stepArithmetic() {
+      const phase = floor(tick / 43) % 4;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const center = grid[idx(x, y)];
+          const east = grid[idx((x + 1) % cols, y)];
+          const south = grid[idx(x, (y + 1) % rows)];
+          const west = grid[idx((x - 1 + cols) % cols, y)];
+          const north = grid[idx(x, (y - 1 + rows) % rows)];
+          const murmur = floor(noise(x * 0.12, y * 0.12, tick * 0.018) * radix);
+          const diagonalTax = ((x + y + tick + seed) % (radix + 3) === 0) ? 1 : 0;
+          let sum;
+          if (phase === 0) sum = center + east + south + murmur;
+          else if (phase === 1) sum = center * 2 + west + south + diagonalTax;
+          else if (phase === 2) sum = center + north + east + floor(murmur / 2);
+          else sum = center + north + west + south + east;
+
+          const carry = floor(sum / radix);
+          const remainder = sum % radix;
+          nextGrid[idx(x, y)] = remainder;
+
+          const rareWrongness = carry > 0 && ((remainder + carry + x * 2 + y * 3 + tick) % (radix - 1 || 1) === 0);
+          if (rareWrongness) {
+            pulseCount++;
+            carries.push({
+              x: (x - 1) * cell + cell * 0.5,
+              y: (y - 1) * cell + cell * 0.5,
+              vx: (east - west) * 0.018 * cell + random(-0.18, 0.18),
+              vy: (south - north) * 0.018 * cell + random(-0.18, 0.18),
+              carry,
+              rem: remainder,
+              age: 0,
+              ttl: random(70, 150),
+              hue: (168 + carry * 37 + remainder * 11 + phase * 26) % 360
+            });
+          }
+        }
+      }
+      const swap = grid;
+      grid = nextGrid;
+      nextGrid = swap;
+      if (carries.length > 900) carries.splice(0, carries.length - 900);
+    }
+
+    function drawRemainders() {
+      noStroke();
+      textAlign(CENTER, CENTER);
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const v = grid[idx(x, y)];
+          const px = (x - 1) * cell;
+          const py = (y - 1) * cell;
+          const n = noise(x * 0.045, y * 0.045, tick * 0.01);
+          const heat = pow((v + 1) / radix, 1.4);
+          const hue = (196 + v * 17 + n * 24) % 360;
+          fill(hue, 42 + heat * 38, 9 + heat * 58, 30 + heat * 64);
+          const r = cell * (0.14 + heat * 0.58 + n * 0.18);
+          circle(px + cell * 0.5, py + cell * 0.5, r);
+
+          if (((x * 11 + y * 7 + tick) % 41 === 0) && heat > 0.46) {
+            fill((hue + 38) % 360, 18, 90, 70);
+            textSize(max(9, cell * 0.48));
+            text(GLYPHS[v], px + cell * 0.5, py + cell * 0.5);
+          }
+        }
+      }
+    }
+
+    function drawCarries() {
+      blendMode(ADD);
+      for (let i = carries.length - 1; i >= 0; i--) {
+        const c = carries[i];
+        c.age++;
+        c.x += c.vx + sin((tick + c.rem) * 0.035) * 0.11;
+        c.y += c.vy + cos((tick + c.carry) * 0.031) * 0.11;
+        const life = 1 - c.age / c.ttl;
+        if (life <= 0 || c.x < -60 || c.x > width + 60 || c.y < -60 || c.y > height + 60) {
+          carries.splice(i, 1);
+          continue;
+        }
+        const shimmer = noise(c.x * 0.008, c.y * 0.008, tick * 0.02);
+        stroke(c.hue, 68, 96, 54 * life);
+        strokeWeight((0.8 + c.carry * 0.42 + shimmer * 1.6) * life);
+        line(c.x - c.vx * 16, c.y - c.vy * 16, c.x, c.y);
+        noStroke();
+        fill((c.hue + shimmer * 40) % 360, 42, 96, 92 * life);
+        circle(c.x, c.y, (3 + c.carry * 2.7 + shimmer * 5) * life);
+        if (shimmer > 0.66) {
+          fill((c.hue + 64) % 360, 18, 98, 95 * life);
+          textAlign(CENTER, CENTER);
+          textSize(9 + c.carry * 1.8);
+          text('+' + c.carry, c.x + 8, c.y - 10);
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawChecksumRing() {
+      const sum = checksum();
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      const digits = sum.toString(radix).padStart(5, '0').slice(-9).toUpperCase();
+      const radius = min(width, height) * (0.16 + (sum % 17) * 0.006 + sin(tick * 0.025) * 0.012);
+      noFill();
+      stroke(184, 31, 82, 24);
+      strokeWeight(1);
+      circle(cx, cy, radius * 2);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      for (let i = 0; i < digits.length; i++) {
+        const a = (i / digits.length) * TAU - tick * 0.006;
+        fill((184 + i * 13 + sum % 60) % 360, 28, 92, 76);
+        text(digits[i], cx + cos(a) * radius, cy + sin(a) * radius);
+      }
+    }
+
+    function checksum() {
+      let sum = 0;
+      for (let y = 1; y < rows - 1; y += 2) {
+        for (let x = 1; x < cols - 1; x += 2) {
+          sum = (sum + grid[idx(x, y)] * (x + 3) * (y + 5)) % 104729;
+        }
+      }
+      return sum;
+    }
+
+    function idx(x, y) {
+      return y * cols + x;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      seed = floor(random(1e9));
+      rebuild();
+    }
+  </script>
+</body>
+</html>
