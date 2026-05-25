@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>phase subpoena</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background:#05070b; overflow:hidden; color:rgba(229,236,221,.72); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    canvas { display:block; }
+    .caption { position:fixed; left:18px; bottom:16px; max-width:min(860px,calc(100vw - 36px)); font-size:12px; line-height:1.45; letter-spacing:.04em; color:rgba(229,236,221,.56); pointer-events:none; text-shadow:0 0 18px rgba(168,210,255,.14); }
+    .readout { position:fixed; top:16px; right:18px; text-align:right; white-space:pre; font-size:11px; line-height:1.55; letter-spacing:.11em; color:rgba(176,216,255,.58); pointer-events:none; text-shadow:0 0 18px rgba(72,156,255,.22); }
+  </style>
+</head>
+<body>
+  <div class="readout" id="readout">PHASE SUBPOENA</div>
+  <div class="caption">phase subpoena · each moving point is forced to testify about a future angle · only residues that agree across delay survive long enough to draw a line</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    p5.disableFriendlyErrors = true;
+
+    const MODS = [7, 9, 11, 13];
+    let seed, modulus, witnesses, verdicts, readout, tick = 0, cx, cy, radius;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 255);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Consolas, monospace');
+      readout = document.getElementById('readout');
+      seed = floor(random(1e9));
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(seed); noiseSeed(seed);
+      tick = 0; verdicts = [];
+      cx = width / 2; cy = height / 2; radius = min(width, height) * 0.34;
+      modulus = MODS[seed % MODS.length];
+      const n = constrain(floor((width * height) / 15500), 42, 96);
+      witnesses = [];
+      for (let i = 0; i < n; i++) {
+        witnesses.push({
+          id: i,
+          phase: random(TAU),
+          speed: random(0.002, 0.014) * (random() < 0.5 ? -1 : 1),
+          orbit: radius * random(0.18, 1.02),
+          delay: floor(random(13, 97)),
+          residue: floor(random(modulus)),
+          memory: []
+        });
+      }
+      background(222, 55, 3);
+    }
+
+    function draw() {
+      tick++;
+      background(222, 55, 3, 24);
+      drawCourt();
+      const positions = updateWitnesses();
+      const agreements = callTestimony(positions);
+      drawWitnesses(positions, agreements);
+      drawVerdicts();
+      if (tick % 19 === 0) {
+        const stable = agreements.filter(Boolean).length;
+        readout.textContent = `PHASE SUBPOENA\nSEED ${seed.toString(16)}\nMOD ${modulus}\nWITNESSES ${witnesses.length}\nCONCORD ${stable}\nVERDICTS ${verdicts.length}`;
+      }
+    }
+
+    function updateWitnesses() {
+      return witnesses.map(w => {
+        const wobble = noise(w.id * 0.71, tick * 0.006, seed * 0.00001) - 0.5;
+        const a = w.phase + tick * w.speed + wobble * 0.9;
+        const r = w.orbit * (0.78 + 0.22 * sin(tick * 0.006 + w.id));
+        const x = cx + cos(a) * r;
+        const y = cy + sin(a) * r;
+        const future = floor(((a + w.speed * w.delay + TAU) % TAU) / TAU * modulus);
+        w.memory.push(future);
+        if (w.memory.length > 121) w.memory.shift();
+        return { x, y, a, future, w };
+      });
+    }
+
+    function callTestimony(pos) {
+      const ok = new Array(pos.length).fill(false);
+      strokeWeight(1);
+      for (let i = 0; i < pos.length; i++) {
+        const p = pos[i], prior = p.w.memory[p.w.memory.length - 1 - min(p.w.delay, p.w.memory.length - 1)];
+        const oath = (p.future + p.w.residue + floor(tick / 37)) % modulus;
+        const agrees = prior !== undefined && ((prior + p.w.residue) % modulus) === oath;
+        ok[i] = agrees;
+        if (!agrees) continue;
+        for (let j = i + 1; j < pos.length; j++) {
+          const q = pos[j];
+          const dist2 = sq(p.x - q.x) + sq(p.y - q.y);
+          const same = ((q.future + q.w.residue + floor(tick / 37)) % modulus) === oath;
+          if (same && dist2 < sq(radius * 0.34)) {
+            const hue = (205 + oath * 21 + tick * 0.08) % 360;
+            stroke(hue, 55, 88, map(dist2, 0, sq(radius * 0.34), 80, 4));
+            line(p.x, p.y, q.x, q.y);
+            if (random() < 0.012) verdicts.push({ x:(p.x+q.x)/2, y:(p.y+q.y)/2, life:120, oath, born:tick });
+          }
+        }
+      }
+      return ok;
+    }
+
+    function drawCourt() {
+      noFill();
+      for (let k = 1; k <= modulus; k++) {
+        stroke(210 + k * 7, 45, 55, 18);
+        ellipse(cx, cy, radius * 2 * k / modulus, radius * 2 * k / modulus);
+      }
+      for (let k = 0; k < modulus; k++) {
+        const a = k / modulus * TAU - HALF_PI;
+        stroke(205, 30, 70, 22);
+        line(cx, cy, cx + cos(a) * radius * 1.08, cy + sin(a) * radius * 1.08);
+      }
+    }
+
+    function drawWitnesses(pos, ok) {
+      noStroke();
+      pos.forEach((p, i) => {
+        const hue = ok[i] ? (170 + p.future * 24) % 360 : 224;
+        fill(hue, ok[i] ? 62 : 24, ok[i] ? 96 : 55, ok[i] ? 210 : 92);
+        circle(p.x, p.y, ok[i] ? 5.2 : 2.6);
+        if (ok[i]) {
+          fill(hue, 30, 100, 70);
+          text(p.future.toString(modulus), p.x + 7, p.y - 6);
+        }
+      });
+    }
+
+    function drawVerdicts() {
+      verdicts = verdicts.filter(v => v.life-- > 0);
+      verdicts.forEach(v => {
+        const a = (v.born * 0.03 + v.oath) % TAU;
+        stroke((188 + v.oath * 26) % 360, 70, 100, v.life * 1.4);
+        noFill();
+        arc(v.x, v.y, 18 + (120 - v.life) * 0.7, 18 + (120 - v.life) * 0.7, a, a + PI * 1.25);
+      });
+    }
+
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+    function mousePressed() { seed = floor(random(1e9)); rebuild(); }
+  </script>
+</body>
+</html>
