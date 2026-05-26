@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '014-residence-atlas', title: 'residence atlas', date: '2026-05-26' },
   { id: '013-phase-subpoena', title: 'phase subpoena', date: '2026-05-25' },
   { id: '012-carry-field', title: 'carry field', date: '2026-05-24' },
   { id: '011-return-sieve', title: 'return sieve', date: '2026-05-23' },

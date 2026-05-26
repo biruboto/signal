@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>residence atlas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #080706; overflow: hidden; color: rgba(229, 215, 200, 0.25); }
+    canvas { display: block; }
+    .caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      font: 11px/1.4 'Courier New', monospace;
+      letter-spacing: 0.15em;
+      pointer-events: none;
+      opacity: 0.65;
+      text-shadow: 0 0 12px rgba(200, 140, 80, 0.08);
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+  <div class="caption">residence atlas — a survey of where time settles</div>
+  <script>
+    p5.disableFriendlyErrors = true;
+
+    const RES = 80;            // cells per row/column
+    const THRESH = 0.018;      // stability threshold
+    const MAX_DUR = 900;       // max tracked frames (~15s at 60fps)
+
+    let dur, prev;
+    let sources = [];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      let n = RES * RES;
+      dur = new Float32Array(n);
+      prev = new Float32Array(n);
+      // 5 wave sources scattered across the field
+      for (let i = 0; i < 5; i++) {
+        sources.push({
+          x: random(0.18, 0.82),
+          y: random(0.18, 0.82),
+          f: random(0.5, 2.4),
+          p: random(TWO_PI),
+          s: random(0.4, 1.8)
+        });
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+
+    function draw() {
+      background(8, 7, 6);
+
+      let t = millis() / 1000;
+      let cw = width / RES;
+      let ch = height / RES;
+
+      noStroke();
+
+      // Draw cells
+      for (let r = 0; r < RES; r++) {
+        for (let c = 0; c < RES; c++) {
+          let idx = r * RES + c;
+          let u = (c + 0.5) / RES;
+          let v = (r + 0.5) / RES;
+
+          // Interference field: sum of radial waves from 5 sources
+          let wave = 0;
+          for (let src of sources) {
+            let dx = u - src.x;
+            let dy = v - src.y;
+            let d = sqrt(dx * dx + dy * dy);
+            wave += sin(d * 12 * src.f - t * src.s + src.p);
+          }
+          wave /= sources.length;
+
+          // Check stability — has the wave value stayed put?
+          let stable = abs(wave - prev[idx]) < THRESH;
+          dur[idx] = stable ? min(dur[idx] + 1, MAX_DUR) : 0;
+          prev[idx] = wave;
+
+          // Map duration to brightness via smoothstep
+          let b = dur[idx] / 120;
+          b = constrain(b, 0, 1);
+          b = b * b * (3 - 2 * b); // smoothstep for nicer falloff
+
+          // Warm palette: dark blue-black at 0, amber-gold at 1
+          let rC = b * 200;
+          let gC = b * 120 - b * b * 30;
+          let bC = b * 25 + (1 - b) * 18;
+
+          fill(rC, gC, bC);
+          rect(c * cw, r * ch, cw + 0.5, ch + 0.5);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
