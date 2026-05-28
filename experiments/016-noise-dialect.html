@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>016 · noise dialect</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: #05060b;
+      color: #c8d6e5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    #caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(680px, calc(100vw - 36px));
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      color: rgba(200, 214, 229, 0.68);
+      text-shadow: 0 1px 10px #000;
+      pointer-events: none;
+    }
+    #caption b {
+      color: rgba(230, 240, 255, 0.9);
+      font-weight: 500;
+    }
+    #caption .dim { color: rgba(200, 214, 229, 0.4); }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>noise dialect</b> <span class="dim">negotiating vocabulary…</span></div>
+
+  <script>
+    const caption = document.getElementById('caption');
+    const GLYPHS = ['dot', 'ring', 'vbar', 'hbar', 'slash', 'bslash', 'cross', 'wedge'];
+
+    const drawFns = [
+      (r) => { ellipse(0, 0, r * 1.4); },                                      // dot
+      (r) => { noFill(); ellipse(0, 0, r * 1.8); },                             // ring
+      (r) => { const h = r * 1.6; line(0, -h, 0, h); },                        // vbar
+      (r) => { const w = r * 1.6; line(-w, 0, w, 0); },                        // hbar
+      (r) => { const d = r * 1.1; line(-d, d, d, -d); },                       // slash
+      (r) => { const d = r * 1.1; line(-d, -d, d, d); },                       // bslash
+      (r) => { const d = r * 1.4; line(-d, 0, d, 0); line(0, -d, 0, d); },    // cross
+      (r) => { const s = r * 1.2; triangle(0, -s, -s * 0.75, s * 0.5, s * 0.75, s * 0.5); } // wedge
+    ];
+
+    let cols, rows;
+    let cellSize = 20;
+    let seed = 2805;
+    let time = 0;
+    let frame = 0;
+    let lastLine = '';
+    let glyphCounts = new Array(8).fill(0);
+
+    function computeGrid() {
+      cellSize = constrain(floor(min(width, height) / 38), 14, 28);
+      cols = floor(width / cellSize) + 1;
+      rows = floor(height / cellSize) + 1;
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      noiseSeed(seed);
+      randomSeed(seed);
+      computeGrid();
+      background(5, 6, 11);
+    }
+
+    function draw() {
+      frame++;
+      time += 0.0022;
+
+      // Residue layer — never fully clears, leaves ghost trails
+      noStroke();
+      fill(5, 6, 11, 26);
+      rect(0, 0, width, height);
+
+      const scaleA = 0.009;
+      const scaleB = 0.013;
+      const offset = 9.7;
+      const tA = time;
+      const tB = time * 0.63;
+
+      glyphCounts.fill(0);
+      let drawn = 0;
+      let totalCells = cols * rows;
+
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          // Perturb grid position with a third noise field
+          const px = (noise(i * 0.43, j * 0.43, time * 1.1) - 0.5) * cellSize * 0.28;
+          const py = (noise(i * 0.43 + 5, j * 0.43 + 5, time * 1.1) - 0.5) * cellSize * 0.28;
+
+          const x = i * cellSize + cellSize / 2 + px;
+          const y = j * cellSize + cellSize / 2 + py;
+
+          // Two independent noise fields
+          const nA = noise(i * scaleA, j * scaleA, tA);
+          const nB = noise(i * scaleB + offset, j * scaleB + offset, tB);
+
+          const diff = nB - nA;           // [-1, 1]
+          const closeness = 1 - abs(diff); // [0, 1], 1 = identical
+
+          // Draw probability: high where fields agree, sparse where they diverge
+          const drawChance = closeness * closeness * 0.92 + 0.04;
+          if (random() > drawChance) continue;
+
+          let glyphIdx = floor(map(diff, -0.92, 0.92, 0, 8));
+          glyphIdx = constrain(glyphIdx, 0, 7);
+          glyphCounts[glyphIdx]++;
+          drawn++;
+
+          // Visual properties
+          const alpha = constrain(map(closeness, 0.15, 0.88, 16, 225), 8, 240);
+          const hue = map(glyphIdx, 0, 7, 195, 315);
+          const sat = map(closeness, 0, 1, 18, 50);
+          const bri = constrain(map(closeness, 0.15, 0.88, 28, 82), 20, 90);
+          const glyphR = cellSize * map(closeness, 0, 1, 0.14, 0.40);
+
+          push();
+          translate(x, y);
+          stroke(hue, sat * 0.7, bri, alpha);
+          strokeWeight(map(closeness, 0, 1, 0.5, 1.6));
+
+          if (closeness > 0.68) {
+            fill(hue, sat, bri, alpha * 0.7);
+          } else {
+            noFill();
+          }
+
+          drawFns[glyphIdx](glyphR);
+          pop();
+        }
+      }
+
+      // Dominance analysis
+      let maxCount = 0;
+      let dominant = 0;
+      for (let k = 0; k < 8; k++) {
+        if (glyphCounts[k] > maxCount) { maxCount = glyphCounts[k]; dominant = k; }
+      }
+
+      // Vocabulary breadth: how many glyph types have meaningful presence
+      const threshold = max(drawn * 0.04, 2);
+      let vocabBreadth = 0;
+      for (let k = 0; k < 8; k++) {
+        if (glyphCounts[k] >= threshold) vocabBreadth++;
+      }
+
+      const density = drawn > 0 ? (drawn / totalCells * 100).toFixed(1) : '0.0';
+      const dominance = drawn > 0 ? (maxCount / drawn * 100).toFixed(0) : '0';
+
+      // Update readout periodically
+      if (frame % 53 === 1) {
+        const descriptors = [
+          `${GLYPHS[dominant]} dominates (${dominance}%)`,
+          `vocabulary breadth: ${vocabBreadth}/8`,
+          `density: ${density}%`
+        ];
+        lastLine = descriptors.join(' · ');
+      }
+
+      caption.innerHTML = `<b>noise dialect</b> <span class="dim">two noise fields negotiate a surface; each glyph drawn from their local difference.</span><br>` +
+        lastLine;
+    }
+
+    function mousePressed() {
+      seed = (seed * 16807 + floor(mouseX) * 73 + floor(mouseY) * 191) % 2147483647;
+      noiseSeed(seed);
+      randomSeed(seed);
+      time = 0;
+      frame = 0;
+      background(5, 6, 11);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      computeGrid();
+      background(5, 6, 11);
+    }
+  </script>
+</body>
+</html>
