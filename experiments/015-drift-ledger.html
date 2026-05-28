@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>015 · drift ledger</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: #050608;
+      color: #d7e7df;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    #caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(680px, calc(100vw - 36px));
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      color: rgba(222, 246, 236, 0.72);
+      text-shadow: 0 1px 10px #000;
+      pointer-events: none;
+    }
+    #caption b {
+      color: rgba(244, 255, 250, 0.92);
+      font-weight: 500;
+    }
+    #caption .dim { color: rgba(222, 246, 236, 0.45); }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>drift ledger</b> <span class="dim">initializing residue accounts…</span></div>
+
+  <script>
+    const caption = document.getElementById('caption');
+    const primes = [5, 7, 11, 13, 17, 19, 23, 29];
+    let cells = [];
+    let cols = 0;
+    let rows = 0;
+    let scale = 18;
+    let tick = 0;
+    let seed = 15027;
+    let lastPhrase = '';
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSL, 360, 100, 100, 1);
+      noiseSeed(seed);
+      randomSeed(seed);
+      initializeLedger();
+    }
+
+    function initializeLedger() {
+      scale = constrain(Math.floor(Math.min(width, height) / 42), 12, 24);
+      cols = Math.ceil(width / scale) + 2;
+      rows = Math.ceil(height / scale) + 2;
+      cells = new Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const p = primes[(x * 3 + y * 5 + seed) % primes.length];
+          const vow = ((x + 1) * (x + 1) + (y + 3) * p + seed) % (p * 2 + 1);
+          cells[i] = {
+            x, y, p,
+            balance: vow % p,
+            debt: 0,
+            age: (x * 17 + y * 31) % 97,
+            hue: 156 + ((x * 11 - y * 7 + p * 13) % 90)
+          };
+        }
+      }
+      background(5, 7, 3);
+    }
+
+    function draw() {
+      tick++;
+      noStroke();
+      fill(220, 18, 3, 0.12);
+      rect(0, 0, width, height);
+
+      let audit = 0;
+      let openAccounts = 0;
+      let heaviest = { debt: 0, x: 1, y: 1, p: 5 };
+      const t = tick * 0.007;
+
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const c = cells[y * cols + x];
+          const n = noise(x * 0.065, y * 0.065, t);
+          const witness = Math.floor(n * c.p * 3 + tick / c.p + c.age) % c.p;
+          const old = c.balance;
+          c.balance = (c.balance + witness + x + y) % c.p;
+          const discrepancy = ((c.balance - old + c.p) % c.p) - Math.floor(c.p / 2);
+          c.debt = c.debt * 0.965 + discrepancy;
+          c.age = (c.age + witness + 1) % 997;
+          audit += Math.abs(c.debt);
+
+          if (Math.abs(c.debt) > 2.15) openAccounts++;
+          if (Math.abs(c.debt) > Math.abs(heaviest.debt)) heaviest = c;
+
+          if ((tick + x * 3 + y * 7) % c.p === 0 || Math.abs(c.debt) > 2.6) {
+            const px = (x - 1) * scale;
+            const py = (y - 1) * scale;
+            const intensity = constrain(Math.abs(c.debt) / 5, 0.08, 0.82);
+            const h = (c.hue + c.debt * 18 + tick * 0.08 + 360) % 360;
+            fill(h, 58, 58 + intensity * 24, 0.055 + intensity * 0.32);
+            rect(px, py, scale * 0.92, scale * 0.92, scale * 0.22);
+
+            if (Math.abs(c.debt) > 3.2) {
+              stroke(h, 72, 75, 0.16);
+              strokeWeight(1);
+              const nx = x + Math.sign(c.debt) * ((c.p % 3) - 1);
+              const ny = y + ((witness % 3) - 1);
+              line(px + scale / 2, py + scale / 2, (nx - 1) * scale + scale / 2, (ny - 1) * scale + scale / 2);
+              noStroke();
+            }
+          }
+        }
+      }
+
+      const meanDebt = audit / Math.max(1, (cols - 2) * (rows - 2));
+      if (tick % 37 === 1) {
+        const direction = heaviest.debt < 0 ? 'owed back to silence' : 'borrowed from noise';
+        const residue = Math.abs(Math.round(heaviest.debt * 1000)) % heaviest.p;
+        lastPhrase = `account (${heaviest.x},${heaviest.y}) mod ${heaviest.p}: residue ${residue}, ${direction}`;
+      }
+
+      caption.innerHTML = `<b>drift ledger</b> <span class="dim">each cell keeps a modular account of its own prediction errors; debts leak but never quite settle.</span><br>` +
+        `open accounts: ${openAccounts} · mean discrepancy: ${meanDebt.toFixed(3)} · ${lastPhrase}`;
+    }
+
+    function mousePressed() {
+      seed = (seed * 48271 + Math.floor(mouseX) * 97 + Math.floor(mouseY) * 193) % 2147483647;
+      noiseSeed(seed);
+      randomSeed(seed);
+      initializeLedger();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      initializeLedger();
+    }
+  </script>
+</body>
+</html>
