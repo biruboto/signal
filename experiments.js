@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '017-threshold-fossil', title: 'threshold fossil', date: '2026-05-29' },
   { id: '016-noise-dialect', title: 'noise dialect', date: '2026-05-28' },
   { id: '015-drift-ledger', title: 'drift ledger', date: '2026-05-27' },
   { id: '014-residence-atlas', title: 'residence atlas', date: '2026-05-26' },

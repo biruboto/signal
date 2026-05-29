@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>017 · threshold fossil</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: #03050a;
+      color: #d7e2ef;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    #caption {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      color: rgba(215, 226, 239, 0.68);
+      text-shadow: 0 1px 12px #000;
+      pointer-events: none;
+    }
+    #caption b { color: rgba(245, 250, 255, 0.92); font-weight: 500; }
+    #caption .dim { color: rgba(215, 226, 239, 0.42); }
+    #caption .hot { color: rgba(255, 207, 119, 0.86); }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>threshold fossil</b> <span class="dim">waiting for noise to become geology…</span></div>
+
+  <script>
+    const caption = document.getElementById('caption');
+
+    let cols, rows, cell;
+    let charge = [];
+    let fossil = [];
+    let age = [];
+    let tick = 0;
+    let seed = 1729;
+    let activeCount = 0;
+    let lastPhrase = '';
+
+    const syllables = ['ash', 'gate', 'lime', 'rill', 'mote', 'vane', 'silt', 'pulse', 'amber', 'fault', 'index', 'salt'];
+
+    function allocate() {
+      cell = constrain(floor(min(width, height) / 58), 9, 18);
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      const n = cols * rows;
+      charge = new Float32Array(n);
+      fossil = new Float32Array(n);
+      age = new Uint16Array(n);
+      activeCount = 0;
+      noiseSeed(seed);
+      randomSeed(seed);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          charge[i] = noise(x * 0.08, y * 0.08) * 0.35;
+          fossil[i] = 0;
+          age[i] = 0;
+        }
+      }
+    }
+
+    function idx(x, y) {
+      x = (x + cols) % cols;
+      y = (y + rows) % rows;
+      return y * cols + x;
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      allocate();
+      background(220, 55, 3);
+    }
+
+    function draw() {
+      tick++;
+      noStroke();
+      fill(220, 50, 3, 0.11);
+      rect(0, 0, width, height);
+
+      const cx = floor((cols / 2) + cos(tick * 0.0061) * cols * 0.27);
+      const cy = floor((rows / 2) + sin(tick * 0.0047) * rows * 0.23);
+      const pulse = 0.58 + 0.18 * sin(tick * 0.017);
+      activeCount = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const lap = (
+            charge[idx(x - 1, y)] + charge[idx(x + 1, y)] +
+            charge[idx(x, y - 1)] + charge[idx(x, y + 1)]
+          ) * 0.25 - charge[i];
+
+          const orbit = sin((x * 0.21) + tick * 0.011) * cos((y * 0.17) - tick * 0.009);
+          const well = 1 / (1 + dist(x, y, cx, cy) * 0.09);
+          const rain = noise(x * 0.055, y * 0.055, tick * 0.011) - 0.5;
+          let next = charge[i] + lap * 0.42 + rain * 0.105 + orbit * 0.014 + well * 0.025;
+          next *= 0.988;
+
+          const threshold = pulse + 0.09 * noise(x * 0.13 + 9, y * 0.13 - 4);
+          if (next > threshold) {
+            const excess = next - threshold;
+            fossil[i] = min(1, fossil[i] + 0.22 + excess * 1.8);
+            age[i] = min(65535, age[i] + 1);
+            next = threshold * 0.38;
+          } else {
+            fossil[i] *= 0.9975;
+            if (fossil[i] < 0.015) age[i] = 0;
+          }
+          charge[i] = next;
+
+          if (fossil[i] > 0.04) {
+            activeCount++;
+            const a = fossil[i];
+            const h = (38 + age[i] * 2.7 + x * 0.35 - y * 0.22) % 360;
+            const b = 18 + a * 72;
+            fill(h, 62, b, 0.20 + a * 0.58);
+            const pad = max(1, cell * (0.16 + (1 - a) * 0.16));
+            rect(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2, cell * 0.18);
+
+            if (age[i] > 2 && (age[i] % 11 === 0)) {
+              stroke((h + 160) % 360, 28, 92, 0.10);
+              strokeWeight(1);
+              line(x * cell + cell * 0.5, y * cell + cell * 0.5,
+                   (x + ((age[i] % 3) - 1)) * cell + cell * 0.5,
+                   (y + (((age[i] + x) % 3) - 1)) * cell + cell * 0.5);
+              noStroke();
+            }
+          }
+        }
+      }
+
+      if (tick % 45 === 0) {
+        const density = activeCount / (cols * rows);
+        const wordA = syllables[floor(noise(tick * 0.013) * syllables.length) % syllables.length];
+        const wordB = syllables[floor(noise(4 + tick * 0.017) * syllables.length) % syllables.length];
+        const wordC = syllables[floor(noise(11 + tick * 0.019) * syllables.length) % syllables.length];
+        lastPhrase = `${wordA}-${wordB}-${wordC}`;
+        caption.innerHTML = `<b>threshold fossil</b> <span class="dim">field cells only remember crossings:</span> <span class="hot">${nf(density * 100, 1, 2)}%</span> lithified · current stratum: ${lastPhrase}`;
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      allocate();
+      background(220, 55, 3);
+    }
+  </script>
+</body>
+</html>
