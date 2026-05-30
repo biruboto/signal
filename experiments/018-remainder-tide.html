@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>remainder tide</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #07090d;
+      color: #d8dfef;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    canvas { display: block; }
+    #readout {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(720px, calc(100vw - 36px));
+      color: rgba(224, 232, 248, 0.78);
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.85);
+      pointer-events: none;
+    }
+    #readout b { color: rgba(255, 222, 157, 0.95); font-weight: 500; }
+    #readout .dim { color: rgba(224, 232, 248, 0.42); }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <script>
+    let t = 0;
+    let modulusA = 37;
+    let modulusB = 61;
+    let seeds = [];
+    let readout;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('readout');
+      reseed();
+    }
+
+    function reseed() {
+      seeds = [];
+      const count = 144;
+      for (let i = 0; i < count; i++) {
+        const n = i + 1;
+        seeds.push({
+          n,
+          phase: (n * n * 17 + n * 43) % 997,
+          weight: 0.35 + (((n * 29) % 113) / 113) * 0.9,
+          residue: ((n * n * n) + 11 * n) % modulusB
+        });
+      }
+    }
+
+    function draw() {
+      background(7, 9, 13, 34);
+      const cx = width / 2;
+      const cy = height / 2;
+      const minDim = min(width, height);
+      const tide = 0.5 + 0.5 * sin(t * 0.011);
+      const slow = frameCount * 0.006;
+
+      noFill();
+      strokeWeight(1);
+      for (let ring = 0; ring < 9; ring++) {
+        const r = minDim * (0.11 + ring * 0.047) + sin(slow + ring) * 18;
+        const c = 24 + ring * 14;
+        stroke(70, 99, 138, 16 + ring * 4);
+        circle(cx, cy, r * 2);
+        stroke(220, 183, 112, 8);
+        const bite = TWO_PI * (((ring * ring + frameCount * 0.03) % modulusA) / modulusA);
+        arc(cx, cy, r * 2.04, r * 2.04, bite, bite + 0.2 + tide * 0.9);
+      }
+
+      blendMode(ADD);
+      const active = [];
+      for (const s of seeds) {
+        const a = TWO_PI * (((s.n * s.n + frameCount * s.weight * 0.071) % modulusA) / modulusA);
+        const b = TWO_PI * (((s.residue + frameCount * 0.038 + sin(slow + s.phase) * 9) % modulusB) / modulusB);
+        const radius = minDim * (0.13 + 0.34 * ((s.n % 23) / 23)) + sin(slow * s.weight + s.phase) * 28;
+        const x = cx + cos(a + sin(b) * 0.37) * radius + cos(b * 3) * 22;
+        const y = cy + sin(b + cos(a) * 0.29) * radius + sin(a * 2) * 22;
+        const lock = abs(((s.n * s.n + floor(frameCount * s.weight)) % modulusA) - (s.residue % modulusA));
+        const near = lock < 3 || lock > modulusA - 3;
+        const alpha = near ? 118 : 24 + 30 * sin(slow + s.phase);
+        stroke(93, 157, 226, alpha * 0.45);
+        line(cx + cos(a) * 18, cy + sin(b) * 18, x, y);
+        noStroke();
+        fill(88, 168, 245, alpha);
+        circle(x, y, near ? 5.5 : 2.2);
+        if (near) active.push(s.n);
+      }
+
+      for (let i = 0; i < active.length; i++) {
+        for (let j = i + 1; j < active.length; j++) {
+          if ((active[i] + active[j]) % 7 !== 0) continue;
+          const ai = TWO_PI * (((active[i] * active[i] + frameCount * 0.05) % modulusA) / modulusA);
+          const aj = TWO_PI * (((active[j] * active[j] + frameCount * 0.05) % modulusA) / modulusA);
+          stroke(255, 209, 135, 18);
+          line(cx + cos(ai) * minDim * 0.38, cy + sin(ai) * minDim * 0.38,
+               cx + cos(aj) * minDim * 0.38, cy + sin(aj) * minDim * 0.38);
+        }
+      }
+      blendMode(BLEND);
+
+      const tideName = active.length < 8 ? 'thin' : active.length < 17 ? 'braided' : 'flooded';
+      readout.innerHTML = `<b>remainder tide</b> · mod ${modulusA}/${modulusB} · ${tideName} interval<br>` +
+        `<span class="dim">integers are released into two clocks; when their remainders nearly agree, a brief estuary appears.</span><br>` +
+        `current witnesses: ${active.slice(0, 18).join(', ') || 'none'}${active.length > 18 ? ' …' : ''}`;
+      t++;
+    }
+
+    function mousePressed() {
+      modulusA = 31 + (floor(mouseX / max(1, width) * 41) | 1);
+      modulusB = 47 + (floor(mouseY / max(1, height) * 53) | 1);
+      reseed();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
