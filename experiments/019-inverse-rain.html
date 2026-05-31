@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>inverse rain</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #06080c;
+      color: #dce8f6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    canvas { display: block; }
+    #readout {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      color: rgba(220, 232, 246, 0.78);
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.9);
+      pointer-events: none;
+    }
+    #readout b { color: rgba(184, 224, 255, 0.98); font-weight: 500; }
+    #readout .dim { color: rgba(220, 232, 246, 0.44); }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <script>
+    let primes = [29, 31, 37, 41, 43, 47, 53, 59, 61];
+    let drops = [];
+    let wells = [];
+    let readout;
+    let modulus = 47;
+    let selectedPrime = null;
+    let lastWitnesses = [];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('readout');
+      resetField();
+    }
+
+    function resetField() {
+      drops = [];
+      wells = [];
+      modulus = selectedPrime || primes[floor((Date.now() / 1000) % primes.length)];
+      for (let n = 1; n < modulus; n++) {
+        const inv = inverseMod(n, modulus);
+        drops.push({
+          n,
+          inv,
+          phase: (n * 97 + inv * 31) % 1000,
+          speed: 0.18 + ((n * inv) % 17) * 0.018,
+          memory: 0
+        });
+      }
+      for (let i = 0; i < 18; i++) {
+        wells.push({
+          x: ((i * i * 13 + 17) % modulus) / modulus,
+          y: ((i * 23 + i * i * 7 + 5) % modulus) / modulus,
+          charge: 0,
+          label: i
+        });
+      }
+      background(6, 8, 12);
+    }
+
+    function inverseMod(a, m) {
+      let t = 0, nt = 1, r = m, nr = a;
+      while (nr !== 0) {
+        const q = Math.floor(r / nr);
+        [t, nt] = [nt, t - q * nt];
+        [r, nr] = [nr, r - q * nr];
+      }
+      return (t + m) % m;
+    }
+
+    function draw() {
+      background(6, 8, 12, 31);
+      const margin = min(width, height) * 0.09;
+      const w = width - margin * 2;
+      const h = height - margin * 2;
+      const tick = frameCount * 0.006;
+      lastWitnesses = [];
+
+      noFill();
+      strokeWeight(1);
+      for (let i = 0; i <= modulus; i++) {
+        const x = margin + (i / modulus) * w;
+        const y = margin + (i / modulus) * h;
+        stroke(70, 96, 132, i % 7 === 0 ? 34 : 12);
+        line(x, margin, x, height - margin);
+        line(margin, y, width - margin, y);
+      }
+
+      for (const well of wells) {
+        well.charge *= 0.965;
+      }
+
+      blendMode(ADD);
+      for (const d of drops) {
+        const reciprocalX = d.n / modulus;
+        const inverseY = d.inv / modulus;
+        const drift = sin(tick * (2.1 + d.speed * 6) + d.phase) * 0.035;
+        const fall = (frameCount * d.speed + d.phase) % 1;
+        const x = margin + ((reciprocalX + drift + 1) % 1) * w;
+        const y = margin + ((inverseY * 0.62 + fall * 0.38) % 1) * h;
+        const trueY = margin + inverseY * h;
+
+        stroke(86, 158, 224, 32);
+        line(x, margin, x, y);
+        stroke(182, 219, 255, 36);
+        line(x - 8, trueY, x + 8, trueY);
+
+        let nearWell = null;
+        let best = 999;
+        for (const well of wells) {
+          const wx = margin + well.x * w;
+          const wy = margin + well.y * h;
+          const dist2 = sq((x - wx) / w) + sq((y - wy) / h);
+          if (dist2 < best) { best = dist2; nearWell = well; }
+        }
+        const witness = best < 0.00042 || ((d.n * d.inv + floor(frameCount * 0.17)) % modulus) === 1;
+        if (witness && nearWell) {
+          nearWell.charge += 0.6;
+          d.memory = min(1, d.memory + 0.08);
+          lastWitnesses.push(`${d.n}↔${d.inv}`);
+        } else {
+          d.memory *= 0.965;
+        }
+
+        noStroke();
+        fill(88, 180, 255, 38 + d.memory * 130);
+        circle(x, y, 2.6 + d.memory * 5);
+        if (d.memory > 0.42) {
+          stroke(255, 211, 142, 45 + d.memory * 80);
+          line(x, y, margin + inverseY * w, margin + reciprocalX * h);
+        }
+      }
+
+      for (const well of wells) {
+        const wx = margin + well.x * w;
+        const wy = margin + well.y * h;
+        const r = 8 + min(46, well.charge * 9);
+        noFill();
+        stroke(255, 199, 119, 14 + min(100, well.charge * 18));
+        circle(wx, wy, r);
+        stroke(111, 203, 188, 12 + min(70, well.charge * 12));
+        arc(wx, wy, r * 1.7, r * 1.7, tick + well.label, tick + well.label + PI * 0.7);
+      }
+      blendMode(BLEND);
+
+      const mood = lastWitnesses.length < 3 ? 'dry congruence' : lastWitnesses.length < 9 ? 'receiving' : 'overfull';
+      readout.innerHTML = `<b>inverse rain</b> · mod ${modulus} · ${mood}<br>` +
+        `<span class="dim">each drop falls from a number toward its modular inverse; wells brighten where reciprocal paths accidentally confess.</span><br>` +
+        `witness pairs: ${lastWitnesses.slice(0, 14).join('  ') || 'none'}${lastWitnesses.length > 14 ? ' …' : ''}`;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      background(6, 8, 12);
+    }
+
+    function mousePressed() {
+      const index = primes.indexOf(modulus);
+      selectedPrime = primes[(index + 1) % primes.length];
+      resetField();
+    }
+  </script>
+</body>
+</html>
