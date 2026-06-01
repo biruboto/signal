@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>carry orchard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #05070a;
+      color: #dfe9ef;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    canvas { display: block; }
+    #readout {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(820px, calc(100vw - 36px));
+      color: rgba(223, 233, 239, 0.74);
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.025em;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.92);
+      pointer-events: none;
+    }
+    #readout b { color: rgba(180, 231, 202, 0.98); font-weight: 500; }
+    #readout .dim { color: rgba(223, 233, 239, 0.43); }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <script>
+    const bases = [3, 4, 5, 7, 8, 9, 11];
+    let cells = [];
+    let sparks = [];
+    let seed = 0;
+    let base = 7;
+    let cols = 48;
+    let rows = 30;
+    let cell = 14;
+    let originX = 0;
+    let originY = 0;
+    let readout;
+    let lastCarry = 0;
+    let checksum = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('readout');
+      seed = daySeed();
+      base = bases[seed % bases.length];
+      buildOrchard();
+    }
+
+    function daySeed() {
+      const d = new Date();
+      const key = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+      let x = key ^ 0x9e3779b9;
+      x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+      return Math.abs(x);
+    }
+
+    function buildOrchard() {
+      cols = Math.max(24, Math.floor(width / 18));
+      rows = Math.max(18, Math.floor(height / 22));
+      cell = Math.min(width / (cols + 5), height / (rows + 7));
+      originX = (width - cols * cell) / 2;
+      originY = (height - rows * cell) / 2 - cell * 0.6;
+      cells = [];
+      checksum = 0;
+      for (let y = 0; y < rows; y++) {
+        const row = [];
+        for (let x = 0; x < cols; x++) {
+          const n = (x + 1) * (y + 3) + seed + x * x * 17 + y * y * 31;
+          const digit = positiveMod(n + bitcount(n) * 5, base);
+          checksum = (checksum + digit * (x + 1) * (y + 1)) % 9973;
+          row.push({ digit, next: digit, age: 0, bloom: 0, carried: false });
+        }
+        cells.push(row);
+      }
+      sparks = [];
+      background(5, 7, 10);
+    }
+
+    function positiveMod(n, m) {
+      return ((n % m) + m) % m;
+    }
+
+    function bitcount(n) {
+      n = Math.abs(n);
+      let c = 0;
+      while (n) { c += n & 1; n >>>= 1; }
+      return c;
+    }
+
+    function draw() {
+      background(5, 7, 10, 44);
+      if (frameCount % 18 === 0) stepOrchard();
+      const t = frameCount * 0.01;
+
+      strokeWeight(1);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const c = cells[y][x];
+          const px = originX + x * cell;
+          const py = originY + y * cell;
+          const v = c.digit / Math.max(1, base - 1);
+          const pulse = c.bloom * (0.55 + 0.45 * sin(t * 4 + x * 0.7));
+          const r = cell * (0.12 + v * 0.32 + pulse * 0.22);
+
+          if (c.carried) {
+            stroke(118, 226, 190, 34 + pulse * 110);
+            line(px, py, px - cell, py - cell);
+            line(px, py, px + cell, py - cell);
+          }
+
+          noStroke();
+          fill(30 + v * 70, 54 + v * 120 + pulse * 80, 72 + v * 80, 115 + v * 75 + pulse * 60);
+          ellipse(px, py, r * 2.0, r * 2.0);
+          fill(169, 241, 204, 28 + pulse * 95);
+          ellipse(px + sin(t + y) * r * 0.4, py - cos(t + x) * r * 0.4, r * 0.8, r * 0.8);
+
+          c.bloom *= 0.88;
+          c.age++;
+        }
+      }
+
+      blendMode(ADD);
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.life -= 0.018;
+        s.u += s.speed;
+        const ax = originX + s.x0 * cell;
+        const ay = originY + s.y0 * cell;
+        const bx = originX + s.x1 * cell;
+        const by = originY + s.y1 * cell;
+        const u = constrain(s.u, 0, 1);
+        const x = lerp(ax, bx, u);
+        const y = lerp(ay, by, u) + sin(u * PI) * -cell * 0.8;
+        noStroke();
+        fill(116, 232, 196, 180 * s.life);
+        ellipse(x, y, cell * 0.25, cell * 0.25);
+        if (s.life <= 0 || s.u >= 1) sparks.splice(i, 1);
+      }
+      blendMode(BLEND);
+
+      const density = (lastCarry / (cols * rows)).toFixed(3);
+      readout.innerHTML = `<b>carry orchard</b> · base ${base} · each cell adds its two upper neighbors; overflow becomes a seed in the row below · carry density ${density} · checksum ${checksum}<br><span class="dim">a fruiting map of arithmetic debt: nothing moves downward except the remainder of too much structure</span>`;
+    }
+
+    function stepOrchard() {
+      lastCarry = 0;
+      let newChecksum = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = cells[y][x];
+          const leftParent = cells[(y - 1 + rows) % rows][(x - 1 + cols) % cols].digit;
+          const rightParent = cells[(y - 1 + rows) % rows][(x + 1) % cols].digit;
+          const seasonal = ((frameCount / 18 + x * 3 + y * 5 + seed) % 29 === 0) ? 1 : 0;
+          const sum = here.digit + leftParent + rightParent + seasonal;
+          const carry = Math.floor(sum / base);
+          here.next = sum % base;
+          here.carried = carry > 0;
+          if (carry) {
+            lastCarry++;
+            here.bloom = 1;
+            const targetY = (y + carry) % rows;
+            const targetX = (x + carry * (y % 3 - 1) + cols) % cols;
+            cells[targetY][targetX].next = (cells[targetY][targetX].next + carry) % base;
+            sparks.push({ x0: x, y0: y, x1: targetX, y1: targetY, u: 0, speed: 0.05 + carry * 0.014, life: 1 });
+          }
+          newChecksum = (newChecksum + here.next * (x + 11) * (y + 7)) % 9973;
+        }
+      }
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) cells[y][x].digit = cells[y][x].next;
+      }
+      checksum = newChecksum;
+      if (sparks.length > 420) sparks.splice(0, sparks.length - 420);
+    }
+
+    function mousePressed() {
+      base = bases[(bases.indexOf(base) + 1) % bases.length];
+      buildOrchard();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      buildOrchard();
+    }
+  </script>
+</body>
+</html>
