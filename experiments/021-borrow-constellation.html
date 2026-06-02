@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>borrow constellation</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #07080d; color: #d8dacd; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    canvas { display: block; }
+    #label { position: fixed; left: 18px; bottom: 16px; max-width: 680px; color: rgba(230,230,210,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em; text-shadow: 0 1px 8px #000; }
+    #label b { color: #fff6c4; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="label"><b>borrow constellation</b> — each point subtracts its delayed neighbor in base 11; negative residues borrow from the next orbit. bright knots are debts that survived three rotations.</div>
+  <script>
+    const BASE = 11;
+    const COUNT = 420;
+    const DELAY = 37;
+    let residues = [];
+    let debtAge = [];
+    let stars = [];
+    let readout;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('label');
+      initField();
+      frameRate(30);
+    }
+
+    function initField() {
+      residues = [];
+      debtAge = [];
+      stars = [];
+      randomSeed(21021);
+      noiseSeed(21021);
+      for (let i = 0; i < COUNT; i++) {
+        const seed = (i * i + 3 * i + floor(7 * noise(i * 0.071))) % BASE;
+        residues.push(seed);
+        debtAge.push(0);
+        stars.push({
+          a: TWO_PI * i / COUNT,
+          r: 0.16 + 0.43 * pow((i % 89) / 88, 0.72) + 0.045 * noise(i),
+          drift: random(-0.0009, 0.0009),
+          pulse: random(TAU)
+        });
+      }
+    }
+
+    function stepBorrow() {
+      const next = new Array(COUNT);
+      const nextDebt = new Array(COUNT).fill(0);
+      let carries = 0;
+      for (let i = 0; i < COUNT; i++) {
+        const j = (i + COUNT - DELAY) % COUNT;
+        let raw = residues[i] - residues[j] - (debtAge[j] > 0 ? 1 : 0);
+        let borrowed = raw < 0;
+        if (borrowed) { raw += BASE; carries++; }
+        next[i] = raw;
+        nextDebt[(i + 1) % COUNT] = max(nextDebt[(i + 1) % COUNT], borrowed ? min(9, debtAge[i] + 1) : max(0, debtAge[i] - 1));
+      }
+      residues = next;
+      debtAge = nextDebt;
+      return carries;
+    }
+
+    function draw() {
+      background(7, 8, 13, 48);
+      const cx = width / 2;
+      const cy = height / 2;
+      const scale = min(width, height);
+      const t = frameCount * 0.01;
+      const carries = stepBorrow();
+
+      noFill();
+      stroke(255, 246, 196, 13);
+      strokeWeight(1);
+      for (let ring = 1; ring <= 6; ring++) circle(cx, cy, scale * ring * 0.137);
+
+      blendMode(ADD);
+      for (let i = 0; i < COUNT; i++) {
+        const s = stars[i];
+        const residue = residues[i];
+        const debt = debtAge[i];
+        const angle = s.a + t * (0.23 + residue * 0.017) + s.drift * frameCount;
+        const radius = scale * (s.r + 0.018 * sin(t * 3 + s.pulse + residue));
+        const x = cx + cos(angle) * radius;
+        const y = cy + sin(angle) * radius * 0.82;
+        const px = cx + cos(angle - 0.018 * (debt + 1)) * (radius - scale * 0.016);
+        const py = cy + sin(angle - 0.018 * (debt + 1)) * (radius - scale * 0.016) * 0.82;
+
+        const hue = residue / (BASE - 1);
+        const rr = lerp(88, 255, hue);
+        const gg = lerp(110, 205, 1 - abs(hue - 0.45));
+        const bb = lerp(210, 92, hue);
+        stroke(rr, gg, bb, 16 + debt * 18);
+        strokeWeight(0.7 + debt * 0.22);
+        line(px, py, x, y);
+        noStroke();
+        fill(rr, gg, bb, 28 + debt * 28);
+        circle(x, y, 1.8 + residue * 0.25 + debt * 0.9);
+        if (debt >= 3) {
+          fill(255, 247, 184, 75 + debt * 12);
+          circle(x, y, 5 + debt * 1.6);
+        }
+      }
+      blendMode(BLEND);
+
+      const stableDebts = debtAge.filter(d => d >= 3).length;
+      if (readout) {
+        readout.innerHTML = `<b>borrow constellation</b> — ${carries} fresh borrows / ${stableDebts} durable knots · base ${BASE}, delay ${DELAY}. each point subtracts its delayed neighbor; negative residues borrow from the next orbit.`;
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
