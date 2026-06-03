@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>fold census</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #06070b; color: #dfe2d2; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    canvas { display: block; }
+    #label { position: fixed; left: 18px; bottom: 16px; max-width: 760px; color: rgba(231,234,214,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em; text-shadow: 0 1px 10px #000; }
+    #label b { color: #f5f0b8; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="label"><b>fold census</b> — a field counts itself through a mirror. each residue votes with its folded coordinate; ties become pale fault lines, majorities become weather.</div>
+  <script>
+    const PRIME = 29;
+    const STEP_A = 11;
+    const STEP_B = 7;
+    const CELL = 12;
+    let cols = 0;
+    let rows = 0;
+    let field = [];
+    let nextField = [];
+    let label;
+    let tick = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      label = document.getElementById('label');
+      initField();
+      frameRate(24);
+    }
+
+    function initField() {
+      cols = Math.ceil(width / CELL) + 2;
+      rows = Math.ceil(height / CELL) + 2;
+      field = new Array(cols * rows);
+      nextField = new Array(cols * rows);
+      noiseSeed(22022);
+      randomSeed(22022);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const folded = ((x + 1) * (rows - y + 3) + (y + 2) * (cols - x + 5)) % PRIME;
+          const grain = Math.floor(noise(x * 0.09, y * 0.09) * PRIME);
+          field[idx(x, y)] = (x * x + 3 * y + folded + grain) % PRIME;
+        }
+      }
+      tick = 0;
+    }
+
+    function idx(x, y) {
+      x = (x + cols) % cols;
+      y = (y + rows) % rows;
+      return y * cols + x;
+    }
+
+    function step() {
+      let margins = 0;
+      let ties = 0;
+      let flips = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = field[idx(x, y)];
+          const mirror = field[idx(cols - 1 - x, rows - 1 - y)];
+          const north = field[idx(x, y - 1)];
+          const east = field[idx(x + 1, y)];
+          const witness = (north + east + tick) % PRIME;
+          let vote = (here * STEP_A + mirror * STEP_B + witness) % PRIME;
+          const margin = Math.abs(here - mirror);
+          if (margin === 0 || margin === PRIME - 1) {
+            vote = (vote + Math.floor(tick / 3) + x + y) % PRIME;
+            ties++;
+          }
+          if ((vote > here && mirror < here) || (vote < here && mirror > here)) flips++;
+          margins += Math.min(margin, PRIME - margin);
+          nextField[idx(x, y)] = vote;
+        }
+      }
+      const swap = field;
+      field = nextField;
+      nextField = swap;
+      tick++;
+      return { meanMargin: margins / (cols * rows), ties, flips };
+    }
+
+    function draw() {
+      const report = step();
+      background(6, 7, 11);
+      noStroke();
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const v = field[idx(x, y)];
+          const m = field[idx(cols - 1 - x, rows - 1 - y)];
+          const foldedDifference = Math.min(Math.abs(v - m), PRIME - Math.abs(v - m));
+          const pulse = 0.5 + 0.5 * Math.sin((tick + v * 3 + x - y) * 0.055);
+          const heat = foldedDifference / (PRIME / 2);
+          const r = lerp(23, 238, heat) + 22 * pulse;
+          const g = lerp(42, 214, 1 - Math.abs(heat - 0.48)) + 8 * pulse;
+          const b = lerp(72, 188, 1 - heat) + 28 * (1 - pulse);
+          const a = 72 + 128 * heat;
+          fill(r, g, b, a);
+          rect(x * CELL - CELL, y * CELL - CELL, CELL + 0.6, CELL + 0.6);
+
+          if (foldedDifference <= 1) {
+            fill(248, 241, 185, 122);
+            const s = 1.4 + 3.8 * pulse;
+            rect(x * CELL - CELL / 2 - s / 2, y * CELL - CELL / 2 - s / 2, s, s);
+          }
+        }
+      }
+
+      blendMode(ADD);
+      strokeWeight(1);
+      for (let k = 0; k < 18; k++) {
+        const y = ((tick * 1.7 + k * height / 18) % (height + 80)) - 40;
+        stroke(245, 240, 184, 8 + k % 4);
+        line(0, y, width, height - y);
+      }
+      blendMode(BLEND);
+
+      if (label) {
+        label.innerHTML = `<b>fold census</b> — tick ${tick} · ${report.ties} mirror ties · ${report.flips} reversals · mean folded margin ${report.meanMargin.toFixed(2)}. residues vote with their reflected coordinate; agreement condenses into pale seams.`;
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      initField();
+    }
+  </script>
+</body>
+</html>
