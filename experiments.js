@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '023-witness-knots', title: 'witness knots', date: '2026-06-04' },
   { id: '022-fold-census', title: 'fold census', date: '2026-06-03' },
   { id: '021-borrow-constellation', title: 'borrow constellation', date: '2026-06-02' },
   { id: '020-carry-orchard', title: 'carry orchard', date: '2026-06-01' },
