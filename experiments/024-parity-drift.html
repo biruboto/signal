@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>parity drift</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #04060a; color: #dbe7d4; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: 820px; color: rgba(221,233,214,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em; text-shadow: 0 1px 14px #000; }
+    #caption b { color: #b9f0ff; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>parity drift</b> — a field of cells predicts one bit from its eight neighbors. wrong guesses are not erased; they migrate as checksum weather.</div>
+  <script>
+    const N = 47;
+    const DECAY = 0.945;
+    let cells = [];
+    let next = [];
+    let heat = [];
+    let tick = 0;
+    let caption;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      randomSeed(24047);
+      noiseSeed(24047);
+      caption = document.getElementById('caption');
+      initField();
+      frameRate(24);
+      background(4, 6, 10);
+    }
+
+    function initField() {
+      cells = new Array(N * N);
+      next = new Array(N * N);
+      heat = new Array(N * N).fill(0);
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const r = Math.hypot(x - N / 2, y - N / 2);
+          const seedBit = (Math.floor(noise(x * 0.12, y * 0.12) * 9 + r) + x * y) & 1;
+          cells[idx(x, y)] = seedBit;
+        }
+      }
+      tick = 0;
+    }
+
+    function draw() {
+      noStroke();
+      fill(218, 65, 4, 0.18);
+      rect(0, 0, width, height);
+
+      stepParity();
+      renderField();
+      renderChecksumRivers();
+
+      if (tick % 24 === 0) {
+        const wrong = heat.reduce((a, b) => a + (b > 0.42 ? 1 : 0), 0);
+        caption.innerHTML = `<b>parity drift</b> — ${wrong} cells currently remember a failed prediction. checksum ${(fieldHash() >>> 0).toString(16).padStart(8, '0')} is being weathered, not solved.`;
+      }
+      tick++;
+    }
+
+    function stepParity() {
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const i = idx(x, y);
+          let sum = 0;
+          let weighted = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const b = cells[idx(x + dx, y + dy)];
+              sum += b;
+              weighted += b * ((dx + 2) * 3 + (dy + 2));
+            }
+          }
+          const prediction = (sum + ((x * 17 + y * 29 + tick) % 5 === 0 ? 1 : 0)) & 1;
+          const actual = cells[i];
+          const error = prediction ^ actual;
+          const slowFlip = ((weighted + x * 11 + y * 7 + tick) % 19) === 0;
+          next[i] = error ? prediction : (slowFlip ? 1 - actual : actual);
+          heat[i] = heat[i] * DECAY + error * 0.36;
+        }
+      }
+      const old = cells;
+      cells = next;
+      next = old;
+    }
+
+    function renderField() {
+      const margin = Math.min(width, height) * 0.075;
+      const side = Math.min(width, height) - margin * 2;
+      const ox = (width - side) / 2;
+      const oy = (height - side) / 2;
+      const s = side / N;
+
+      blendMode(BLEND);
+      noStroke();
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const i = idx(x, y);
+          const h = constrain(heat[i], 0, 1.7);
+          const bit = cells[i];
+          const hue = bit ? 188 + h * 30 : 44 - h * 18;
+          const alpha = 0.10 + Math.min(0.58, h * 0.34);
+          fill(hue, 70 + h * 12, 40 + h * 28, alpha);
+          const jitter = (noise(x * 0.19, y * 0.19, tick * 0.009) - 0.5) * s * 0.45 * h;
+          rect(ox + x * s + jitter, oy + y * s - jitter, s * 0.86, s * 0.86);
+        }
+      }
+    }
+
+    function renderChecksumRivers() {
+      const margin = Math.min(width, height) * 0.075;
+      const side = Math.min(width, height) - margin * 2;
+      const ox = (width - side) / 2;
+      const oy = (height - side) / 2;
+      const s = side / N;
+      blendMode(ADD);
+      strokeWeight(Math.max(1, s * 0.12));
+      for (let k = 0; k < 96; k++) {
+        const a = (k * 37 + tick * 3) % (N * N);
+        const x = a % N;
+        const y = Math.floor(a / N);
+        const h = heat[a];
+        if (h < 0.18) continue;
+        const checksum = (x * x + y * 13 + fieldHash() + k) % N;
+        const b = idx(checksum, (y + cells[a] * 11 + k) % N);
+        const x1 = ox + (x + 0.5) * s;
+        const y1 = oy + (y + 0.5) * s;
+        const x2 = ox + ((b % N) + 0.5) * s;
+        const y2 = oy + (Math.floor(b / N) + 0.5) * s;
+        stroke(190 + h * 38, 82, 64, Math.min(0.22, h * 0.08));
+        line(x1, y1, x2, y2);
+      }
+      blendMode(BLEND);
+    }
+
+    function fieldHash() {
+      let h = 2166136261;
+      for (let i = 0; i < cells.length; i += 7) {
+        h ^= (cells[i] ? 251 : 97) + Math.floor(heat[i] * 31) + i;
+        h = Math.imul(h, 16777619);
+      }
+      return h;
+    }
+
+    function idx(x, y) {
+      x = (x + N) % N;
+      y = (y + N) % N;
+      return y * N + x;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      background(4, 6, 10);
+    }
+  </script>
+</body>
+</html>
