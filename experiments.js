@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '025-period-debt', title: 'period debt', date: '2026-06-06' },
   { id: '024-parity-drift', title: 'parity drift', date: '2026-06-05' },
   { id: '023-witness-knots', title: 'witness knots', date: '2026-06-04' },
   { id: '022-fold-census', title: 'fold census', date: '2026-06-03' },
