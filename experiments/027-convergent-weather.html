@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>convergent weather</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #07080c;
+      color: #d8d4c7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    #panel {
+      position: fixed;
+      left: 20px;
+      bottom: 18px;
+      max-width: min(680px, calc(100vw - 40px));
+      color: rgba(232, 226, 208, 0.82);
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.75);
+    }
+    #panel .title {
+      color: rgba(255, 244, 208, 0.95);
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    #panel .muted { color: rgba(178, 188, 190, 0.65); }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <div class="title">convergent weather</div>
+    <div id="readout">measuring rational fronts…</div>
+    <div class="muted">continued-fraction approximants pull invisible isobars through a noisy sky; click to seed another irrational.</div>
+  </div>
+
+  <script>
+    let seed, alpha, terms, convergents, cells = [];
+    let readout;
+    const palette = ['#e8ddaa', '#9ad5c4', '#6f8fb7', '#ce7d73', '#fff4d2'];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('readout');
+      newWeather(Math.floor(Date.now() % 1000000));
+    }
+
+    function newWeather(s) {
+      seed = s;
+      randomSeed(seed);
+      noiseSeed(seed);
+      // A deterministic irrational: sqrt(n) plus a small metallic-ratio echo.
+      const n = 2 + Math.floor(random(2, 31));
+      const metallic = (Math.sqrt(random([2,3,5,7,11,13])) + Math.floor(random(1, 5))) / 2;
+      alpha = Math.sqrt(n) + 1 / (metallic + random(0.05, 0.95));
+      terms = continuedFraction(alpha, 10);
+      convergents = buildConvergents(terms);
+      cells = [];
+      const spacing = Math.max(24, Math.min(width, height) / 24);
+      for (let y = -spacing; y <= height + spacing; y += spacing) {
+        for (let x = -spacing; x <= width + spacing; x += spacing) {
+          const jitter = spacing * 0.33;
+          const c = convergents[Math.floor(random(convergents.length))];
+          cells.push({
+            x: x + random(-jitter, jitter),
+            y: y + random(-jitter, jitter),
+            c,
+            drift: random(TAU),
+            mass: random(0.35, 1.35)
+          });
+        }
+      }
+      updateReadout();
+    }
+
+    function draw() {
+      background(7, 8, 12, 42);
+      const t = millis() * 0.00018;
+
+      noFill();
+      strokeWeight(1);
+      for (let k = 0; k < convergents.length; k++) {
+        const c = convergents[k];
+        const hue = color(palette[k % palette.length]);
+        hue.setAlpha(20 + k * 10);
+        stroke(hue);
+        beginShape();
+        const amp = map(k, 0, convergents.length - 1, height * 0.04, height * 0.31);
+        const freq = c.q / (c.p + c.q);
+        for (let x = -20; x <= width + 20; x += 10) {
+          const phase = x * 0.006 * freq + t * (k + 1) + c.err * 9000;
+          const y = height * (0.18 + 0.065 * k) + Math.sin(phase) * amp * 0.12 + noise(x * 0.002, k, t) * amp;
+          vertex(x, y);
+        }
+        endShape();
+      }
+
+      blendMode(ADD);
+      for (const cell of cells) {
+        const c = cell.c;
+        const pressure = Math.sin((cell.x * c.q - cell.y * c.p) * 0.004 + t * c.q + cell.drift);
+        const eddy = noise(cell.x * 0.004 + t, cell.y * 0.004 - t, c.q * 0.1);
+        const r = map(Math.abs(pressure - (eddy - 0.5)), 0, 1.5, 10, 1, true) * cell.mass;
+        const col = color(palette[(c.index + (pressure > 0 ? 0 : 2)) % palette.length]);
+        col.setAlpha(map(r, 1, 14, 18, 115, true));
+        fill(col);
+        noStroke();
+        const vx = Math.cos(cell.drift + t * c.p) * c.err * 3600;
+        const vy = Math.sin(cell.drift - t * c.q) * c.err * 3600;
+        circle(cell.x + vx, cell.y + vy, r);
+      }
+      blendMode(BLEND);
+
+      if (frameCount % 90 === 0) updateReadout();
+    }
+
+    function continuedFraction(x, count) {
+      const out = [];
+      let v = x;
+      for (let i = 0; i < count; i++) {
+        const a = Math.floor(v);
+        out.push(a);
+        const frac = v - a;
+        if (frac < 1e-9) break;
+        v = 1 / frac;
+      }
+      return out;
+    }
+
+    function buildConvergents(cf) {
+      let p0 = 0, p1 = 1, q0 = 1, q1 = 0;
+      return cf.map((a, index) => {
+        const p = a * p1 + p0;
+        const q = a * q1 + q0;
+        p0 = p1; p1 = p; q0 = q1; q1 = q;
+        return { index, a, p, q, value: p / q, err: Math.abs(alpha - p / q) };
+      });
+    }
+
+    function updateReadout() {
+      const best = convergents[convergents.length - 1];
+      readout.textContent = `α≈${alpha.toFixed(8)} · cf [${terms.join(', ')}] · latest front ${best.p}/${best.q} · error ${best.err.toExponential(2)} · ${cells.length} pressure witnesses`;
+    }
+
+    function mousePressed() {
+      newWeather((seed * 1664525 + 1013904223 + Math.floor(mouseX * 97 + mouseY * 131)) >>> 0);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      newWeather(seed || 1);
+    }
+  </script>
+</body>
+</html>
