@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>stationary fog</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #06070b;
+      color: #ded8c4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    #panel {
+      position: fixed;
+      left: 20px;
+      bottom: 18px;
+      max-width: min(720px, calc(100vw - 40px));
+      font-size: 12px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      color: rgba(226, 222, 203, 0.82);
+      pointer-events: none;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.82);
+    }
+    #panel .title {
+      color: rgba(255, 245, 210, 0.96);
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    #panel .muted { color: rgba(174, 188, 190, 0.64); }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <div class="title">stationary fog</div>
+    <div id="readout">assembling transition weather…</div>
+    <div class="muted">a hidden Markov chain sheds its starting point; each cloud is the residue of repeated forgetting. click to perturb the transition law.</div>
+  </div>
+
+  <script>
+    const N = 9;
+    const palette = ['#f1d28a', '#9bd5c7', '#7e9bd1', '#d7827e', '#c6e48b', '#b69cff'];
+    let seed, matrix, dist, target, nodes, walkers, readout;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readout = document.getElementById('readout');
+      rebuild(Math.floor(Date.now() % 1000000));
+    }
+
+    function rebuild(s) {
+      seed = s >>> 0;
+      randomSeed(seed);
+      noiseSeed(seed);
+      matrix = buildMatrix();
+      target = stationary(matrix, 90);
+      dist = Array.from({ length: N }, () => 1 / N);
+      layoutNodes();
+      walkers = [];
+      const count = Math.floor(Math.min(950, Math.max(320, width * height / 2500)));
+      for (let i = 0; i < count; i++) {
+        const state = Math.floor(random(N));
+        walkers.push({
+          state,
+          next: choose(matrix[state]),
+          u: random(),
+          speed: random(0.0025, 0.011),
+          phase: random(TAU),
+          memory: random(0.4, 1.2)
+        });
+      }
+      updateReadout();
+      background(6, 7, 11);
+    }
+
+    function buildMatrix() {
+      const m = [];
+      for (let i = 0; i < N; i++) {
+        const row = [];
+        let sum = 0;
+        for (let j = 0; j < N; j++) {
+          const ring = Math.min(Math.abs(i - j), N - Math.abs(i - j));
+          const attraction = Math.exp(-ring * 0.72) * random(0.25, 1.8);
+          const oneWay = ((i * 4 + j * 7 + seed) % 11 === 0) ? random(1.4, 3.8) : 0;
+          const diagonal = i === j ? random(0.9, 2.6) : 0;
+          const v = 0.025 + attraction + oneWay + diagonal;
+          row.push(v);
+          sum += v;
+        }
+        m.push(row.map(v => v / sum));
+      }
+      return m;
+    }
+
+    function layoutNodes() {
+      nodes = [];
+      const cx = width * 0.5;
+      const cy = height * 0.48;
+      const r = Math.min(width, height) * 0.29;
+      for (let i = 0; i < N; i++) {
+        const a = -HALF_PI + i * TAU / N + Math.sin(seed * 0.001) * 0.08;
+        nodes.push({
+          x: cx + Math.cos(a) * r * (0.82 + 0.16 * noise(i, seed)),
+          y: cy + Math.sin(a) * r * (0.82 + 0.16 * noise(seed, i)),
+          a
+        });
+      }
+    }
+
+    function draw() {
+      background(6, 7, 11, 34);
+      const empirical = Array(N).fill(0);
+      const t = millis() * 0.00018;
+
+      drawEdges(t);
+      blendMode(ADD);
+      noStroke();
+      for (const w of walkers) {
+        w.u += w.speed;
+        if (w.u >= 1) {
+          w.state = w.next;
+          w.next = choose(matrix[w.state]);
+          w.u = 0;
+          w.speed = random(0.0025, 0.011);
+        }
+        empirical[w.state]++;
+        const a = nodes[w.state];
+        const b = nodes[w.next];
+        const eased = smoothstep(w.u);
+        const bow = Math.sin(eased * PI) * 42 * w.memory;
+        const mx = (a.x + b.x) * 0.5;
+        const my = (a.y + b.y) * 0.5;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const px = -dy / len;
+        const py = dx / len;
+        const x = lerp(a.x, b.x, eased) + px * bow + Math.cos(w.phase + t * 12) * 3;
+        const y = lerp(a.y, b.y, eased) + py * bow + Math.sin(w.phase - t * 9) * 3;
+        const col = color(palette[w.state % palette.length]);
+        col.setAlpha(22 + 95 * target[w.state]);
+        fill(col);
+        circle(x, y, 1.7 + 9 * target[w.state]);
+      }
+      blendMode(BLEND);
+
+      for (let i = 0; i < N; i++) dist[i] = empirical[i] / walkers.length;
+      drawNodes();
+      if (frameCount % 60 === 0) updateReadout();
+    }
+
+    function drawEdges(t) {
+      noFill();
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (i === j || matrix[i][j] < 0.095) continue;
+          const a = nodes[i], b = nodes[j];
+          const alpha = map(matrix[i][j], 0.095, 0.42, 10, 82, true);
+          const col = color(palette[i % palette.length]);
+          col.setAlpha(alpha);
+          stroke(col);
+          strokeWeight(map(matrix[i][j], 0.095, 0.42, 0.4, 2.2, true));
+          const cx = (a.x + b.x) * 0.5 + Math.cos((i + j) * 1.7 + t) * 26;
+          const cy = (a.y + b.y) * 0.5 + Math.sin((i - j) * 1.3 - t) * 26;
+          bezier(a.x, a.y, cx, cy, cx, cy, b.x, b.y);
+        }
+      }
+    }
+
+    function drawNodes() {
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      for (let i = 0; i < N; i++) {
+        const n = nodes[i];
+        const err = Math.abs(dist[i] - target[i]);
+        const outer = 26 + target[i] * 150;
+        const inner = 8 + dist[i] * 120;
+        noFill();
+        stroke(235, 225, 190, 28 + target[i] * 190);
+        strokeWeight(1);
+        circle(n.x, n.y, outer);
+        noStroke();
+        const col = color(palette[i % palette.length]);
+        col.setAlpha(72 + 120 * (1 - Math.min(1, err * 10)));
+        fill(col);
+        circle(n.x, n.y, inner);
+        fill(8, 10, 16, 180);
+        circle(n.x, n.y, 18);
+        fill(238, 231, 206, 190);
+        text(i, n.x, n.y + 0.5);
+      }
+    }
+
+    function stationary(m, steps) {
+      let v = Array.from({ length: N }, () => 1 / N);
+      for (let k = 0; k < steps; k++) {
+        const next = Array(N).fill(0);
+        for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) next[j] += v[i] * m[i][j];
+        v = next;
+      }
+      return v;
+    }
+
+    function choose(weights) {
+      let r = random();
+      for (let i = 0; i < weights.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return i;
+      }
+      return weights.length - 1;
+    }
+
+    function smoothstep(x) {
+      return x * x * (3 - 2 * x);
+    }
+
+    function updateReadout() {
+      const entropy = -target.reduce((s, p) => s + p * Math.log2(p), 0);
+      const drift = dist ? dist.reduce((s, p, i) => s + Math.abs(p - target[i]), 0) : 0;
+      const heaviest = target.reduce((best, p, i) => p > target[best] ? i : best, 0);
+      readout.textContent = `seed ${seed} · invariant mass favors state ${heaviest} (${target[heaviest].toFixed(3)}) · entropy ${entropy.toFixed(2)} bits · present fog drift ${drift.toFixed(3)} · ${walkers.length} walkers forgetting origin`;
+    }
+
+    function mousePressed() {
+      rebuild((seed * 1664525 + 1013904223 + Math.floor(mouseX * 73 + mouseY * 109)) >>> 0);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      layoutNodes();
+      background(6, 7, 11);
+    }
+  </script>
+</body>
+</html>
