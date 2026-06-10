@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>029 — sieve echo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #07080b; color: #d7dde8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(720px, calc(100vw - 36px)); color: rgba(221,230,242,0.74); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 12px rgba(0,0,0,0.65); }
+    #caption b { color: rgba(244,249,255,0.95); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>sieve echo</b> · residues announce themselves only after their factors have passed; click to change the listening prime.</div>
+  <script>
+    const primes = [17, 19, 23, 29, 31, 37, 41, 43];
+    let listenIndex = 3;
+    let cells = [];
+    let cols = 0;
+    let rows = 0;
+    let step = 0;
+    let grain = 12;
+    let hueSeed = 0;
+    let caption;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      listenIndex = (listenIndex + 1) % primes.length;
+      hueSeed += 37;
+      rebuild();
+    }
+
+    function rebuild() {
+      grain = Math.max(8, Math.min(18, Math.floor(Math.sqrt(width * height) / 82)));
+      cols = Math.ceil(width / grain);
+      rows = Math.ceil(height / grain);
+      cells = new Array(cols * rows).fill(0).map((_, i) => seedCell(i));
+      step = 0;
+      updateCaption();
+    }
+
+    function seedCell(i) {
+      const x = i % cols;
+      const y = Math.floor(i / cols);
+      const n = 1 + x + y * cols;
+      const p = primes[listenIndex];
+      const witness = smallestFactor(n + p * ((x ^ y) % 5));
+      const residue = ((n * n + 3 * y + 7 * x) % p) / p;
+      return {
+        charge: residue,
+        echo: witness === p ? 1 : 0,
+        age: (x * 13 + y * 7) % p,
+        debt: 0
+      };
+    }
+
+    function smallestFactor(n) {
+      if (n < 2) return 1;
+      if (n % 2 === 0) return 2;
+      for (let k = 3; k * k <= n; k += 2) if (n % k === 0) return k;
+      return n;
+    }
+
+    function draw() {
+      background(225, 38, 5, 0.22);
+      noStroke();
+      const p = primes[listenIndex];
+      const t = frameCount * 0.007;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const c = cells[i];
+          const left = cells[((x - 1 + cols) % cols) + y * cols];
+          const up = cells[x + ((y - 1 + rows) % rows) * cols];
+          const n = 1 + x + y * cols + step;
+          const residue = (n * (x + 1) + y * y + p) % p;
+          const gate = residue === 0 || (residue + c.age) % p === 1;
+          const borrowed = (left.echo * 0.47 + up.echo * 0.31 + c.debt * 0.22);
+          c.debt = (borrowed + (gate ? 0.55 : 0)) * 0.985;
+          c.echo = Math.max(0, Math.min(1, c.echo * 0.90 + c.debt * 0.18 - 0.015));
+          c.charge = (c.charge + (residue / p) * 0.011 + borrowed * 0.017) % 1;
+          c.age = (c.age + 1 + (gate ? 2 : 0)) % p;
+
+          const pulse = Math.pow(c.echo, 1.35);
+          if (pulse > 0.012) {
+            const h = (205 + hueSeed + p * 3 + c.charge * 95 + sin(t + x * 0.09) * 24) % 360;
+            const sat = 28 + pulse * 58;
+            const bri = 10 + pulse * 76;
+            fill(h, sat, bri, 0.12 + pulse * 0.70);
+            const inset = grain * (0.08 + (1 - pulse) * 0.24);
+            rect(x * grain + inset, y * grain + inset, grain - inset * 2, grain - inset * 2, grain * 0.18);
+          }
+        }
+      }
+
+      drawEchoLines(p);
+      step++;
+      if (frameCount % 90 === 0) updateCaption();
+    }
+
+    function drawEchoLines(p) {
+      blendMode(ADD);
+      strokeWeight(1);
+      for (let k = 0; k < p; k++) {
+        const y = ((k * k * grain * 0.67 + frameCount * (0.18 + k / p)) % (height + 80)) - 40;
+        const alpha = 0.018 + (k % 5) * 0.006;
+        stroke((194 + hueSeed + k * 11) % 360, 46, 62, alpha);
+        line(0, y, width, y + sin(frameCount * 0.01 + k) * 34);
+      }
+      blendMode(BLEND);
+    }
+
+    function updateCaption() {
+      const p = primes[listenIndex];
+      const active = cells.length ? cells.reduce((a, c) => a + (c.echo > 0.16 ? 1 : 0), 0) : 0;
+      caption.innerHTML = `<b>sieve echo</b> · listening prime ${p}; ${active} cells still carrying an afterimage of divisibility. click to retune the sieve.`;
+    }
+  </script>
+</body>
+</html>
