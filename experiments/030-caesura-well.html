@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>030 — caesura well</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05070a; color: #dbe4ef; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(760px, calc(100vw - 36px)); color: rgba(219,228,239,0.76); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 14px rgba(0,0,0,0.7); }
+    #caption b { color: rgba(247,251,255,0.95); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>caesura well</b> · two irrational metronomes mark the plane; the unvisited intervals deepen into wells. click to reseed the silence.</div>
+  <script>
+    const ratios = [
+      { name: 'sqrt2', a: Math.SQRT2 - 1, b: Math.sqrt(3) - 1 },
+      { name: 'gold', a: (Math.sqrt(5) - 1) / 2, b: Math.sqrt(7) - 2 },
+      { name: 'plastic', a: 0.3247179572, b: Math.PI - 3 },
+      { name: 'e-minus', a: Math.E - 2, b: Math.sqrt(11) - 3 }
+    ];
+
+    let cols, rows, grain, field, traces, phase = 0, mode = 0, caption;
+    let wellCount = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      mode = (mode + 1) % ratios.length;
+      phase += 97;
+      rebuild();
+    }
+
+    function rebuild() {
+      grain = Math.max(10, Math.min(19, Math.floor(Math.sqrt(width * height) / 78)));
+      cols = Math.ceil(width / grain);
+      rows = Math.ceil(height / grain);
+      field = new Array(cols * rows).fill(0).map((_, i) => ({ depth: 0, salt: ((i * 37 + phase) % 113) / 113, last: 0 }));
+      traces = [];
+      for (let i = 0; i < 150; i++) traces.push(seedTrace(i));
+      wellCount = 0;
+      updateCaption();
+      background(218, 52, 4);
+    }
+
+    function seedTrace(i) {
+      const r = ratios[mode];
+      return {
+        x: fract((i + 1) * r.a + phase * 0.003) * cols,
+        y: fract((i + 1) * r.b + phase * 0.005) * rows,
+        life: 80 + (i * 17) % 240,
+        tone: (188 + i * 11 + mode * 29) % 360
+      };
+    }
+
+    function draw() {
+      background(218, 52, 4, 0.19);
+      const r = ratios[mode];
+      wellCount = 0;
+
+      // The rule: visits are sparse Beatty-like strikes. Absence accumulates; recent strikes drain it.
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const c = field[i];
+          const n = x + y * cols + frameCount;
+          const strikeA = Math.floor((n + phase) * r.a) % cols === x;
+          const strikeB = Math.floor((n + y * 3 + phase) * r.b) % rows === y;
+          const diagonal = ((x * 5 + y * 7 + frameCount) % 89) === 0;
+          const visited = strikeA || strikeB || diagonal;
+          c.depth = constrain(c.depth + (visited ? -0.23 : 0.010 + c.salt * 0.010), 0, 1);
+          c.last = visited ? 1 : c.last * 0.94;
+
+          const pulse = Math.pow(c.depth, 1.7);
+          if (pulse > 0.035) {
+            wellCount++;
+            const h = (205 + mode * 31 + c.salt * 70 - pulse * 42) % 360;
+            fill(h, 50 + pulse * 35, 8 + pulse * 72, 0.08 + pulse * 0.54);
+            noStroke();
+            const inset = grain * (0.12 + (1 - pulse) * 0.31);
+            rect(x * grain + inset, y * grain + inset, grain - inset * 2, grain - inset * 2, grain * 0.22);
+          }
+          if (c.last > 0.08) {
+            fill(46, 26, 90, c.last * 0.25);
+            noStroke();
+            circle(x * grain + grain / 2, y * grain + grain / 2, grain * (0.18 + c.last * 0.36));
+          }
+        }
+      }
+
+      drawTraces(r);
+      drawRulers(r);
+      if (frameCount % 75 === 0) updateCaption();
+    }
+
+    function drawTraces(r) {
+      blendMode(ADD);
+      noFill();
+      for (let t of traces) {
+        const ix = constrain(Math.floor(t.x), 0, cols - 1);
+        const iy = constrain(Math.floor(t.y), 0, rows - 1);
+        const c = field[ix + iy * cols];
+        const pull = 0.015 + c.depth * 0.18;
+        const ax = (fract((iy + frameCount * 0.07) * r.a) * cols - t.x) * pull;
+        const ay = (fract((ix - frameCount * 0.05) * r.b) * rows - t.y) * pull;
+        const px = t.x * grain + grain / 2;
+        const py = t.y * grain + grain / 2;
+        t.x = (t.x + ax + Math.sin((frameCount + t.life) * 0.013) * 0.13 + cols) % cols;
+        t.y = (t.y + ay + Math.cos((frameCount + t.life) * 0.017) * 0.13 + rows) % rows;
+        stroke(t.tone, 42, 82, 0.10 + c.depth * 0.38);
+        strokeWeight(0.7 + c.depth * 1.7);
+        line(px, py, t.x * grain + grain / 2, t.y * grain + grain / 2);
+        t.life--;
+        if (t.life <= 0) Object.assign(t, seedTrace(Math.floor(random(10000))));
+      }
+      blendMode(BLEND);
+    }
+
+    function drawRulers(r) {
+      strokeWeight(1);
+      for (let k = 1; k < 9; k++) {
+        const x = fract((frameCount * 0.003 + k) * r.a) * width;
+        const y = fract((frameCount * 0.002 + k) * r.b) * height;
+        stroke(190, 38, 70, 0.07);
+        line(x, 0, x, height);
+        stroke(36, 30, 80, 0.055);
+        line(0, y, width, y);
+      }
+    }
+
+    function updateCaption() {
+      const r = ratios[mode];
+      const density = cols && rows ? (wellCount / (cols * rows)).toFixed(3) : '0.000';
+      caption.innerHTML = `<b>caesura well</b> · ratio pair ${r.name}; absence density ${density}. unvisited intervals become gravity until a metronome touches them. click to reseed.`;
+    }
+
+    function fract(n) { return n - Math.floor(n); }
+  </script>
+</body>
+</html>
