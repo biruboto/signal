@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '032-glyph-current', title: 'glyph current', date: '2026-06-13' },
   { id: '031-eigenweather', title: 'eigenweather', date: '2026-06-12' },
   { id: '030-caesura-well', title: 'caesura well', date: '2026-06-11' },
   { id: '029-sieve-echo', title: 'sieve echo', date: '2026-06-10' },

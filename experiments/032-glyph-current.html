@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>032 — glyph current</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #04050a; color: #dfe8f5; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(820px, calc(100vw - 36px)); color: rgba(223,232,245,0.76); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.78); }
+    #caption b { color: rgba(248,252,255,0.96); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>glyph current</b> · symbols drift through a hidden Markov river; when a local prediction fails, the river deposits a brighter grammar. click to reseed the alphabet.</div>
+  <script>
+    const glyphs = ['·','—','+','×','∴','∵','∿','⌁','◦','□','◇','△','∎','⊹','⊙','∧'];
+    const regimes = [
+      { name: 'low braid', hue: 188, pull: 0.41, turn: 3 },
+      { name: 'amber recursion', hue: 38, pull: 0.58, turn: 5 },
+      { name: 'violet quotient', hue: 272, pull: 0.47, turn: 7 },
+      { name: 'green remainder', hue: 126, pull: 0.63, turn: 11 }
+    ];
+
+    let cols, rows, cell, states, nextStates, heat, caption;
+    let seed = 32032, regime = 0, tide = 0, surprise = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textAlign(CENTER, CENTER);
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      regime = (regime + 1) % regimes.length;
+      tide += 97;
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = Math.max(18, Math.min(34, Math.floor(Math.sqrt(width * height) / 38)));
+      cols = Math.ceil(width / cell) + 2;
+      rows = Math.ceil(height / cell) + 2;
+      states = new Uint8Array(cols * rows);
+      nextStates = new Uint8Array(cols * rows);
+      heat = new Float32Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          states[i] = hash(x, y, seed) % glyphs.length;
+          heat[i] = 0;
+        }
+      }
+      surprise = 0;
+      background(225, 62, 3);
+      updateCaption();
+    }
+
+    function draw() {
+      const r = regimes[regime];
+      background(225, 62, 3, 0.31);
+      stepRiver(r);
+      renderCurrent(r);
+      renderGlyphs(r);
+      renderIsobars(r);
+      if (frameCount % 50 === 0) updateCaption();
+    }
+
+    function stepRiver(r) {
+      surprise = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const left = states[((x - 1 + cols) % cols) + y * cols];
+          const up = states[x + ((y - 1 + rows) % rows) * cols];
+          const diag = states[((x + 1) % cols) + ((y - 1 + rows) % rows) * cols];
+          const old = states[i];
+          const clock = Math.floor((frameCount + tide) / (6 + (x + y) % 5));
+          const prediction = (left * 3 + up * 5 + diag * 7 + r.turn + clock) % glyphs.length;
+          const noiseGate = hash(x + clock, y - clock, seed ^ (regime * 7919)) % 100;
+          let neu = prediction;
+          if (noiseGate < 9) neu = (old + left + r.turn) % glyphs.length;
+          if ((old + prediction + x + y + clock) % 13 === 0) neu = (prediction + up + 1) % glyphs.length;
+          nextStates[i] = neu;
+          const miss = Math.abs(neu - prediction) / (glyphs.length - 1);
+          heat[i] = Math.min(1, heat[i] * 0.91 + miss * 0.72 + ((neu === old) ? 0 : 0.035));
+          surprise += heat[i];
+        }
+      }
+      const swap = states; states = nextStates; nextStates = swap;
+      surprise /= states.length;
+    }
+
+    function renderCurrent(r) {
+      noStroke();
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const h = heat[i];
+          if (h < 0.035) continue;
+          const sx = x * cell - cell * 0.5;
+          const sy = y * cell - cell * 0.5;
+          const hue = (r.hue + states[i] * 9 + h * 80) % 360;
+          fill(hue, 54 + h * 42, 18 + h * 72, 0.16 + h * 0.34);
+          rect(sx, sy, cell * (0.85 + h * 0.8), cell * (0.85 + h * 0.8), cell * 0.22);
+        }
+      }
+    }
+
+    function renderGlyphs(r) {
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = x + y * cols;
+          const h = heat[i];
+          const s = states[i];
+          const wobble = Math.sin((frameCount * 0.045) + x * 0.7 + y * 0.31) * cell * 0.08;
+          const px = (x - 0.5) * cell + wobble;
+          const py = (y - 0.5) * cell + Math.cos((frameCount * 0.035) + y * 0.5) * cell * 0.05;
+          const hue = (r.hue + s * 11 + h * 120) % 360;
+          fill(hue, 28 + h * 66, 56 + h * 38, 0.30 + h * 0.62);
+          textSize(cell * (0.48 + h * 0.34));
+          text(glyphs[s], px, py);
+        }
+      }
+    }
+
+    function renderIsobars(r) {
+      noFill();
+      strokeWeight(1);
+      for (let k = 0; k < 7; k++) {
+        const phase = frameCount * 0.012 + k * 0.9 + tide * 0.01;
+        stroke((r.hue + 170 + k * 13) % 360, 38, 78, 0.10);
+        beginShape();
+        for (let x = -20; x <= width + 20; x += 18) {
+          const y = height * (0.18 + k * 0.105) + Math.sin(x * 0.008 * r.pull + phase) * 22 + Math.cos(x * 0.017 + phase * 1.7) * 9;
+          vertex(x, y);
+        }
+        endShape();
+      }
+    }
+
+    function updateCaption() {
+      const r = regimes[regime];
+      caption.innerHTML = `<b>glyph current</b> · ${r.name} · mean prediction residue ${surprise.toFixed(3)} · ${cols}×${rows} cells translate error into alphabetic silt. click to reseed.`;
+    }
+
+    function hash(x, y, s) {
+      let n = (x * 374761393 + y * 668265263 + s * 1442695041) >>> 0;
+      n = (n ^ (n >>> 13)) >>> 0;
+      n = Math.imul(n, 1274126177) >>> 0;
+      return (n ^ (n >>> 16)) >>> 0;
+    }
+  </script>
+</body>
+</html>
