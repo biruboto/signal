@@ -34,6 +34,13 @@ const experiments = [
 ];
 
 const list = document.getElementById('experiment-list');
+const archiveNote = document.getElementById('archive-note');
+
+if (archiveNote && experiments.length > 0) {
+  const newest = experiments[0].date;
+  const oldest = experiments[experiments.length - 1].date;
+  archiveNote.textContent = `${experiments.length} small tests · ${oldest} → ${newest}`;
+}
 
 if (experiments.length === 0) {
   list.innerHTML = '<li class="empty">nothing here yet — check back tomorrow</li>';

@@ -60,6 +60,13 @@ h2 {
   list-style: none;
 }
 
+.archive-note {
+  margin: -0.8rem 0 1.4rem;
+  color: var(--dim);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+}
+
 #experiment-list li {
   padding: 1rem 0;
   border-bottom: 1px solid var(--dim);
