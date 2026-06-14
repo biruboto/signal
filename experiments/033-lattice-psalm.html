@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>033 — lattice psalm</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #03050a; color: #e8eef8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(880px, calc(100vw - 36px)); color: rgba(232,238,248,0.76); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.82); }
+    #caption b { color: rgba(252,253,255,0.96); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>lattice psalm</b> · each cell sings the lowest modulus that predicts its neighbors; contradictions bloom as halos, then cool into a new local arithmetic. click to retune the choir.</div>
+  <script>
+    const primes = [2, 3, 5, 7, 11, 13, 17, 19];
+    const syllables = ['um', 'ra', 'li', 'on', 'ke', 'tu', 'as', 'iv'];
+    let cols, rows, cell, phase, nextPhase, debt, chosen, seed = 33033;
+    let caption, mode = 0, pulse = 0, contradiction = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      textAlign(CENTER, CENTER);
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      mode = (mode + 1) % 4;
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = Math.max(16, Math.min(30, Math.floor(Math.sqrt(width * height) / 42)));
+      cols = Math.ceil(width / cell) + 2;
+      rows = Math.ceil(height / cell) + 2;
+      phase = new Uint16Array(cols * rows);
+      nextPhase = new Uint16Array(cols * rows);
+      debt = new Float32Array(cols * rows);
+      chosen = new Uint8Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const h = hash(x, y, seed);
+          chosen[i] = h % primes.length;
+          phase[i] = (h >>> 8) % primes[chosen[i]];
+          debt[i] = 0;
+        }
+      }
+      background(222, 70, 3);
+      updateCaption();
+    }
+
+    function draw() {
+      pulse += 0.006 + mode * 0.0015;
+      background(222, 70, 3, 0.23);
+      stepPsalm();
+      renderField();
+      renderNotation();
+      if (frameCount % 45 === 0) updateCaption();
+    }
+
+    function stepPsalm() {
+      contradiction = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const left = phase[wrap(x - 1, y)];
+          const right = phase[wrap(x + 1, y)];
+          const up = phase[wrap(x, y - 1)];
+          const down = phase[wrap(x, y + 1)];
+          let bestP = chosen[i], bestScore = 999;
+          for (let p = 0; p < primes.length; p++) {
+            const mod = primes[p];
+            const predicted = (left + right + up + down + x * (mode + 1) + y + frameCount) % mod;
+            const score = Math.abs(predicted - (phase[i] % mod)) + ((hash(x + p, y - p, seed + frameCount) & 7) / 21);
+            if (score < bestScore) { bestScore = score; bestP = p; }
+          }
+          const mod = primes[bestP];
+          const local = (left * 2 + right + up + down * 3 + bestP + mode) % mod;
+          const old = phase[i] % mod;
+          const miss = Math.abs(local - old) / Math.max(1, mod - 1);
+          nextPhase[i] = (local + ((debt[i] > 1.8 && frameCount % (bestP + 2) === 0) ? 1 : 0)) % mod;
+          chosen[i] = bestP;
+          debt[i] = Math.min(4.5, debt[i] * 0.91 + miss * 0.95);
+          contradiction += miss;
+        }
+      }
+      const tmp = phase; phase = nextPhase; nextPhase = tmp;
+      contradiction /= cols * rows;
+    }
+
+    function renderField() {
+      noStroke();
+      const ox = (width - (cols - 2) * cell) / 2 - cell;
+      const oy = (height - (rows - 2) * cell) / 2 - cell;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const p = chosen[i];
+          const mod = primes[p];
+          const v = phase[i] / mod;
+          const h = (185 + p * 23 + mode * 31 + sin(pulse + x * 0.07) * 16) % 360;
+          const bright = 9 + debt[i] * 16 + v * 36;
+          fill(h, 58 + p * 3, bright, 0.78);
+          const shrink = 1 + debt[i] * 1.8;
+          rect(ox + x * cell + shrink / 2, oy + y * cell + shrink / 2, cell - shrink, cell - shrink, 2);
+          if (debt[i] > 1.55) {
+            fill((h + 48) % 360, 35, 95, Math.min(0.38, debt[i] * 0.08));
+            circle(ox + (x + 0.5) * cell, oy + (y + 0.5) * cell, cell * (0.55 + debt[i] * 0.2));
+          }
+        }
+      }
+    }
+
+    function renderNotation() {
+      const ox = (width - (cols - 2) * cell) / 2 - cell;
+      const oy = (height - (rows - 2) * cell) / 2 - cell;
+      textSize(Math.max(8, cell * 0.34));
+      noStroke();
+      for (let y = 1; y < rows - 1; y += 2) {
+        for (let x = 1 + (y % 4 === 0 ? 1 : 0); x < cols - 1; x += 3) {
+          const i = x + y * cols;
+          if (debt[i] < 0.42 && ((x * 13 + y * 17 + frameCount) % 11 !== 0)) continue;
+          const p = chosen[i];
+          fill(210 + p * 16, 18, 94, Math.min(0.78, 0.18 + debt[i] * 0.18));
+          text(syllables[p] + phase[i].toString(16), ox + (x + 0.5) * cell, oy + (y + 0.5) * cell);
+        }
+      }
+      stroke(205, 30, 90, 0.11 + contradiction * 0.3);
+      strokeWeight(1);
+      noFill();
+      for (let r = 0; r < 6; r++) {
+        const w = width * (0.18 + r * 0.14) + sin(pulse * 2 + r) * 28;
+        const h = height * (0.12 + r * 0.09) + cos(pulse * 1.7 + r) * 20;
+        ellipse(width / 2, height / 2, w, h);
+      }
+    }
+
+    function wrap(x, y) {
+      x = (x + cols) % cols;
+      y = (y + rows) % rows;
+      return x + y * cols;
+    }
+
+    function updateCaption() {
+      const p = primes[(mode + frameCount) % primes.length];
+      caption.innerHTML = `<b>lattice psalm</b> · active tuning: mod ${p}; mean contradiction ${contradiction.toFixed(3)}. cells search for the smallest arithmetic that makes their neighbors sound inevitable.`;
+    }
+
+    function hash(x, y, s) {
+      let n = (x * 374761393 + y * 668265263 + s * 1442695041) >>> 0;
+      n = (n ^ (n >>> 13)) >>> 0;
+      n = Math.imul(n, 1274126177) >>> 0;
+      return (n ^ (n >>> 16)) >>> 0;
+    }
+  </script>
+</body>
+</html>
