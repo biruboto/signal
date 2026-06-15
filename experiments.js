@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '034-forgetting-prism', title: 'forgetting prism', date: '2026-06-15' },
   { id: '033-lattice-psalm', title: 'lattice psalm', date: '2026-06-14' },
   { id: '032-glyph-current', title: 'glyph current', date: '2026-06-13' },
   { id: '031-eigenweather', title: 'eigenweather', date: '2026-06-12' },

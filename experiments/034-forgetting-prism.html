@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>034 — forgetting prism</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #02040a; color: #edf4ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(920px, calc(100vw - 36px)); color: rgba(237,244,255,0.76); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.86); }
+    #caption b { color: rgba(255,255,255,0.96); font-weight: 520; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>forgetting prism</b> · an integer stream is folded through incompatible moduli; the canvas keeps only shadows, then highlights places where different origins cast the same remainder. click to rotate the loss function.</div>
+  <script>
+    const palettes = [
+      [196, 222, 281, 334],
+      [42, 128, 188, 266],
+      [166, 206, 248, 312],
+      [18, 72, 176, 287]
+    ];
+    const bases = [29, 31, 37, 41, 43, 47, 53];
+    let grid, nextGrid, age, origin, cols, rows, cell;
+    let walkers = [], seed = 34034, prism = 0, caption, collisions = 0, entropy = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      prism = (prism + 1) % palettes.length;
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = Math.max(9, Math.min(17, Math.floor(Math.sqrt(width * height) / 70)));
+      cols = Math.ceil(width / cell);
+      rows = Math.ceil(height / cell);
+      grid = new Float32Array(cols * rows);
+      nextGrid = new Float32Array(cols * rows);
+      age = new Uint16Array(cols * rows);
+      origin = new Uint16Array(cols * rows);
+      walkers = [];
+      const count = Math.min(360, Math.max(140, Math.floor(cols * rows / 38)));
+      for (let i = 0; i < count; i++) {
+        const h = hash(i, seed, prism);
+        walkers.push({
+          n: (h % 9973) + 3,
+          x: (h >>> 8) % cols,
+          y: (h >>> 17) % rows,
+          r: bases[(h >>> 3) % bases.length],
+          memory: (h >>> 11) & 255
+        });
+      }
+      background(225, 72, 3);
+      updateCaption();
+    }
+
+    function draw() {
+      background(225, 72, 3, 0.18);
+      grid.set(nextGrid);
+      nextGrid.fill(0);
+      collisions = 0;
+      entropy = 0;
+      for (let k = 0; k < walkers.length; k++) advance(walkers[k], k + 1);
+      diffuseAndRender();
+      drawPrismLines();
+      if (frameCount % 50 === 0) updateCaption();
+    }
+
+    function advance(w, id) {
+      const base = w.r + prism * 2;
+      const shadow = (w.n * (prism + 3) + w.memory + frameCount) % base;
+      const turn = ((w.n % 7) - 3) + ((shadow % 3) - 1);
+      const dx = ((shadow + w.memory) % 5) - 2;
+      const dy = ((Math.floor(w.n / base) + turn) % 5) - 2;
+      w.x = mod(w.x + Math.sign(dx || turn || 1), cols);
+      w.y = mod(w.y + Math.sign(dy || -turn || 1), rows);
+      w.n = (w.n * (base - 1) + shadow + id) % 104729;
+      w.memory = ((w.memory * 13) ^ shadow ^ w.n) & 255;
+
+      const idx = w.x + w.y * cols;
+      const previous = origin[idx];
+      const sameShadow = previous && previous !== id && (age[idx] % base) === shadow;
+      if (sameShadow) collisions++;
+      origin[idx] = id;
+      age[idx] = shadow;
+      const charge = sameShadow ? 2.8 : 1.0 + shadow / base;
+      nextGrid[idx] += charge;
+      entropy += Math.abs(((w.memory / 255) - (shadow / base)));
+    }
+
+    function diffuseAndRender() {
+      noStroke();
+      const pal = palettes[prism];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const idx = x + y * cols;
+          const v = grid[idx] * 0.72 + neighbor(x, y) * 0.07;
+          if (v < 0.035) continue;
+          nextGrid[idx] += Math.min(3.8, v * 0.36);
+          const a = Math.min(0.92, 0.12 + v * 0.18);
+          const lane = age[idx] % pal.length;
+          const hue = (pal[lane] + v * 13 + sin(frameCount * 0.013 + x * 0.07) * 8) % 360;
+          const bright = Math.min(96, 10 + v * 18 + (origin[idx] % 11));
+          fill(hue, 55 + lane * 7, bright, a);
+          const px = x * cell, py = y * cell;
+          const inset = Math.max(0, 2.8 - v * 0.24);
+          rect(px + inset, py + inset, cell - inset * 2, cell - inset * 2, 1.5);
+          if (v > 2.25) {
+            fill((hue + 54) % 360, 24, 98, Math.min(0.42, v * 0.06));
+            circle(px + cell / 2, py + cell / 2, Math.min(cell * 2.9, cell * (0.4 + v * 0.24)));
+          }
+        }
+      }
+    }
+
+    function drawPrismLines() {
+      blendMode(ADD);
+      strokeWeight(1);
+      const pal = palettes[prism];
+      for (let i = 0; i < pal.length; i++) {
+        const t = frameCount * 0.004 + i * 1.7 + prism;
+        stroke(pal[i], 42, 84, 0.11);
+        const y1 = height * (0.18 + 0.64 * noise(i * 9.1, t));
+        const y2 = height * (0.18 + 0.64 * noise(i * 9.1 + 40, t));
+        line(0, y1, width, y2);
+      }
+      blendMode(BLEND);
+    }
+
+    function neighbor(x, y) {
+      return grid[mod(x - 1, cols) + y * cols] + grid[mod(x + 1, cols) + y * cols] + grid[x + mod(y - 1, rows) * cols] + grid[x + mod(y + 1, rows) * cols];
+    }
+
+    function updateCaption() {
+      const moduli = bases.slice(prism, prism + 4).concat(bases).slice(0, 4).map(n => n + prism * 2).join(' · ');
+      const density = (collisions / Math.max(1, walkers.length)).toFixed(3);
+      const e = (entropy / Math.max(1, walkers.length)).toFixed(3);
+      caption.innerHTML = `<b>forgetting prism</b> · moduli ${moduli} · collision-density ${density} · remainder-entropy ${e} · the original numbers are gone; only their recurring mistakes remain. click to rotate the loss function.`;
+    }
+
+    function mod(n, m) { return ((n % m) + m) % m; }
+
+    function hash(a, b, c) {
+      let x = (a * 374761393 + b * 668265263 + c * 2246822519) >>> 0;
+      x ^= x >>> 13; x = Math.imul(x, 1274126177) >>> 0; x ^= x >>> 16;
+      return x >>> 0;
+    }
+  </script>
+</body>
+</html>
