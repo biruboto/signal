@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>035 — cofactor fog</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #03050b; color: #eff6ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(920px, calc(100vw - 36px)); color: rgba(239,246,255,0.76); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.9); }
+    #caption b { color: rgba(255,255,255,0.96); font-weight: 520; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>cofactor fog</b> · every lattice point keeps a small rumor about the factors it shares with the present tick; coprime cells go dark, common divisors bloom into weather. click to change the witness clock.</div>
+  <script>
+    let cols, rows, cell, tick = 0, mode = 0, field, nextField, caption;
+    const primes = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47];
+    const clocks = [210, 330, 462, 690, 870, 1001];
+    const hues = [198, 267, 146, 38, 318, 174];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      mode = (mode + 1) % clocks.length;
+      tick = (tick + clocks[mode] / 3) | 0;
+      field.fill(0);
+      nextField.fill(0);
+      updateCaption();
+    }
+
+    function rebuild() {
+      cell = Math.max(8, Math.min(15, Math.floor(Math.sqrt(width * height) / 82)));
+      cols = Math.ceil(width / cell) + 1;
+      rows = Math.ceil(height / cell) + 1;
+      field = new Float32Array(cols * rows);
+      nextField = new Float32Array(cols * rows);
+      background(226, 76, 3);
+      updateCaption();
+    }
+
+    function draw() {
+      const clock = clocks[mode];
+      const phase = (tick % clock) + 1;
+      background(226, 76, 3, 0.18);
+      nextField.fill(0);
+      let blooms = 0, largest = 1, weight = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const n = 1 + ((x + 1) * 17 + (y + 1) * 31 + ((x + 1) * (y + 1)) % 997);
+          const shared = gcd(n + phase, clock + x * 3 + y * 5);
+          const witness = primeWitness(n, phase, x, y);
+          let v = field[i] * 0.945;
+          if (shared > 1) {
+            const pulse = Math.log2(shared + 1) / 5;
+            v += pulse * (0.16 + witness * 0.13);
+            blooms++;
+            largest = Math.max(largest, shared);
+            weight += shared;
+          } else {
+            v *= 0.83;
+          }
+          const drift = ((x + phase) % 3) - 1;
+          const fall = ((y + witness + tick) % 3) - 1;
+          spread(x, y, v, drift, fall);
+        }
+      }
+
+      const tmp = field; field = nextField; nextField = tmp;
+      renderFog(phase, largest);
+      drawRulers(phase);
+      if (tick % 12 === 0) updateCaption(blooms, largest, weight);
+      tick++;
+    }
+
+    function spread(x, y, v, dx, dy) {
+      add(x, y, v * 0.76);
+      add(x + dx, y, v * 0.08);
+      add(x, y + dy, v * 0.08);
+      add(x - dy, y + dx, v * 0.04);
+      add(x + dy, y - dx, v * 0.04);
+    }
+
+    function add(x, y, v) {
+      if (x < 0 || y < 0 || x >= cols || y >= rows) return;
+      const i = x + y * cols;
+      nextField[i] = Math.min(1.8, nextField[i] + v);
+    }
+
+    function renderFog(phase, largest) {
+      noStroke();
+      const baseHue = hues[mode];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const v = field[i];
+          if (v < 0.025) continue;
+          const wobble = noise(x * 0.035, y * 0.035, tick * 0.006);
+          const h = (baseHue + v * 54 + wobble * 38 + largest) % 360;
+          const a = Math.min(0.72, 0.06 + v * 0.42);
+          const s = Math.min(cell * 1.35, cell * (0.32 + v * 0.86));
+          fill(h, 68 + wobble * 20, 42 + Math.min(54, v * 40), a);
+          rect(x * cell - s * 0.5, y * cell - s * 0.5, s, s, Math.max(1, s * 0.2));
+          if (v > 0.92 && ((x * 13 + y * 7 + phase) % 11 === 0)) {
+            fill((h + 62) % 360, 32, 96, 0.62);
+            circle(x * cell, y * cell, Math.max(1.5, cell * 0.18));
+          }
+        }
+      }
+    }
+
+    function drawRulers(phase) {
+      strokeWeight(1);
+      for (let p = 0; p < primes.length; p++) {
+        const q = primes[p];
+        if ((phase + q) % (p + 3) !== 0) continue;
+        const h = (hues[mode] + q * 9) % 360;
+        stroke(h, 42, 82, 0.09);
+        const off = (phase * q) % Math.max(width, height);
+        line(off % width, 0, (off + height * 0.38) % width, height);
+        line(0, off % height, width, (off + width * 0.22) % height);
+      }
+    }
+
+    function primeWitness(n, phase, x, y) {
+      let count = 0;
+      for (let i = 0; i < primes.length; i++) {
+        const p = primes[i];
+        if ((n + phase + x * i + y) % p === 0) count++;
+      }
+      return count;
+    }
+
+    function gcd(a, b) {
+      a = Math.abs(a); b = Math.abs(b);
+      while (b) { const t = b; b = a % b; a = t; }
+      return a;
+    }
+
+    function updateCaption(blooms = 0, largest = 1, weight = 0) {
+      if (!caption) return;
+      const density = cols && rows ? (blooms / (cols * rows)).toFixed(3) : '0.000';
+      caption.innerHTML = `<b>cofactor fog</b> · witness clock ${clocks[mode]} · bloom density ${density} · largest common divisor ${largest} · divisor weather ${Math.round(weight)}. click to change the witness clock.`;
+    }
+  </script>
+</body>
+</html>
