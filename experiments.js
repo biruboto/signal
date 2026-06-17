@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '036-radius-ledger', title: 'radius ledger', date: '2026-06-17' },
   { id: '035-cofactor-fog', title: 'cofactor fog', date: '2026-06-16' },
   { id: '034-forgetting-prism', title: 'forgetting prism', date: '2026-06-15' },
   { id: '033-lattice-psalm', title: 'lattice psalm', date: '2026-06-14' },

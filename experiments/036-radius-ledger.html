@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>036 — radius ledger</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05040a; color: #f3efe7; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(900px, calc(100vw - 36px)); color: rgba(243,239,231,0.75); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.88); }
+    #caption b { color: rgba(255,255,255,0.96); font-weight: 520; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>radius ledger</b> · each cell audits its squared distance against several modular clocks; radii that can be witnessed twice become bright entries, the rest fade into unpaid circumference. click to rotate the auditors.</div>
+  <script>
+    let cols, rows, step, ledger, nextLedger, tick = 0, scheme = 0, caption;
+    const schemes = [
+      { mods: [29, 37, 53], hue: 42, name: 'small primes' },
+      { mods: [40, 63, 88], hue: 182, name: 'composite tribunals' },
+      { mods: [47, 71, 97], hue: 292, name: 'thin witnesses' },
+      { mods: [36, 49, 121], hue: 118, name: 'square debt' }
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      scheme = (scheme + 1) % schemes.length;
+      tick += 137;
+      ledger.fill(0);
+      nextLedger.fill(0);
+      updateCaption(0, 0, 0);
+    }
+
+    function rebuild() {
+      step = Math.max(7, Math.min(14, Math.floor(Math.sqrt(width * height) / 90)));
+      cols = Math.ceil(width / step) + 2;
+      rows = Math.ceil(height / step) + 2;
+      ledger = new Float32Array(cols * rows);
+      nextLedger = new Float32Array(cols * rows);
+      background(258, 62, 4);
+      updateCaption(0, 0, 0);
+    }
+
+    function draw() {
+      const s = schemes[scheme];
+      const cx = cols / 2 + Math.sin(tick * 0.0061) * cols * 0.13;
+      const cy = rows / 2 + Math.cos(tick * 0.0047) * rows * 0.12;
+      const phase = tick % 4096;
+      background(258, 62, 4, 0.20);
+      nextLedger.fill(0);
+      noStroke();
+
+      let entries = 0, unpaid = 0, strongest = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          const dx = x - cx;
+          const dy = y - cy;
+          const r2 = Math.floor(dx * dx + dy * dy);
+          let witnesses = 0;
+          let residueSum = 0;
+          for (const m of s.mods) {
+            const residue = posmod(r2 + phase + x * 3 - y * 5, m);
+            const mirror = posmod((x + 1) * (y + 1) + phase, m);
+            const nearEdge = Math.min(residue, m - residue);
+            if (nearEdge <= 1 || residue === mirror || (residue * residue + phase) % m === (x + y) % m) witnesses++;
+            residueSum += nearEdge / m;
+          }
+
+          let v = ledger[i] * 0.925;
+          if (witnesses >= 2) {
+            const pulse = 0.28 + witnesses * 0.18 + (1 - residueSum / s.mods.length) * 0.22;
+            v += pulse;
+            entries++;
+          } else {
+            v *= 0.86;
+            unpaid++;
+          }
+          strongest = Math.max(strongest, v);
+
+          const angle = Math.atan2(dy, dx) + witnesses * 0.42 + tick * 0.002;
+          const driftX = Math.round(Math.cos(angle));
+          const driftY = Math.round(Math.sin(angle));
+          carry(x, y, v, driftX, driftY);
+        }
+      }
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = x + y * cols;
+          ledger[i] = Math.min(3.2, nextLedger[i]);
+          const v = ledger[i];
+          if (v < 0.025) continue;
+          const px = x * step - step;
+          const py = y * step - step;
+          const b = Math.min(96, 13 + v * 34);
+          const a = Math.min(0.92, 0.10 + v * 0.22);
+          fill((s.hue + v * 46 + x * 0.7 - y * 0.4) % 360, 58 + Math.min(32, v * 11), b, a);
+          rect(px, py, step + 0.7, step + 0.7);
+        }
+      }
+
+      drawRings(cx, cy, s);
+      updateCaption(entries, unpaid, strongest);
+      tick++;
+    }
+
+    function carry(x, y, amount, dx, dy) {
+      const here = x + y * cols;
+      nextLedger[here] += amount * 0.68;
+      const nx = constrain(x + dx, 0, cols - 1);
+      const ny = constrain(y + dy, 0, rows - 1);
+      nextLedger[nx + ny * cols] += amount * 0.22;
+      const sx = constrain(x - dy, 0, cols - 1);
+      const sy = constrain(y + dx, 0, rows - 1);
+      nextLedger[sx + sy * cols] += amount * 0.07;
+    }
+
+    function drawRings(cx, cy, s) {
+      push();
+      noFill();
+      strokeWeight(1);
+      translate(cx * step - step / 2, cy * step - step / 2);
+      for (let k = 0; k < s.mods.length; k++) {
+        const m = s.mods[k];
+        const radius = ((tick * (k + 2)) % (Math.max(width, height) * 0.52)) + m * 0.35;
+        stroke((s.hue + k * 32) % 360, 72, 88, 0.13);
+        circle(0, 0, radius);
+      }
+      pop();
+    }
+
+    function posmod(n, m) { return ((n % m) + m) % m; }
+
+    function updateCaption(entries, unpaid, strongest) {
+      const s = schemes[scheme];
+      caption.innerHTML = `<b>radius ledger</b> · ${s.name}: mod ${s.mods.join(', ')} · ${entries} double-witnessed radii / ${unpaid} unpaid cells · strongest entry ${strongest.toFixed(2)} · click to rotate the auditors.`;
+    }
+  </script>
+</body>
+</html>
