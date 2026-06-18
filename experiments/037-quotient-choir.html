@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>037 — quotient choir</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #04050b; color: #f6efe3; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 18px; bottom: 16px; max-width: min(920px, calc(100vw - 36px)); color: rgba(246,239,227,0.74); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em; text-shadow: 0 1px 18px rgba(0,0,0,0.9); }
+    #caption b { color: rgba(255,255,255,0.96); font-weight: 520; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>quotient choir</b> · a grid divides a moving integer by several witnesses; only the quotient is allowed to sing, while the remainders choose the direction of the next breath. click to change the divisors.</div>
+  <script>
+    let cols, rows, step, cells, nextCells, t = 0, mode = 0, caption;
+    const modes = [
+      { name: 'coprime reeds', divisors: [7, 11, 17, 29], hue: 205 },
+      { name: 'square throats', divisors: [9, 16, 25, 49], hue: 48 },
+      { name: 'near twins', divisors: [23, 29, 31, 37], hue: 302 },
+      { name: 'heavy composites', divisors: [18, 42, 66, 90], hue: 132 }
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      textFont('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace');
+      caption = document.getElementById('caption');
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function mousePressed() {
+      mode = (mode + 1) % modes.length;
+      seedCells(113 + mode * 37);
+      updateCaption(0, 0, 0);
+    }
+
+    function rebuild() {
+      step = Math.max(8, Math.min(16, Math.floor(Math.sqrt(width * height) / 82)));
+      cols = Math.ceil(width / step) + 2;
+      rows = Math.ceil(height / step) + 2;
+      cells = new Float32Array(cols * rows);
+      nextCells = new Float32Array(cols * rows);
+      seedCells(37);
+      background(232, 70, 4);
+    }
+
+    function seedCells(salt) {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = hash(x, y, salt);
+          cells[x + y * cols] = ((n % 1000) / 1000) * 0.8;
+        }
+      }
+      nextCells.fill(0);
+    }
+
+    function draw() {
+      const m = modes[mode];
+      const driftX = Math.sin(t * 0.009) * cols * 0.18;
+      const driftY = Math.cos(t * 0.007) * rows * 0.16;
+      background(232, 70, 4, 0.18);
+      noStroke();
+
+      let choir = 0;
+      let silence = 0;
+      let bright = 0;
+      nextCells.fill(0);
+
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = x + y * cols;
+          const voice = cells[i];
+          const base = Math.floor((x + 3) * (y + 5) + t * 2 + voice * 997 + driftX * x - driftY * y);
+
+          let consonance = 0;
+          let remainderWind = 0;
+          let quotientTone = 0;
+          for (let k = 0; k < m.divisors.length; k++) {
+            const d = m.divisors[k];
+            const q = Math.floor(Math.abs(base) / d);
+            const r = posmod(base + k * x - y, d);
+            const edge = Math.min(r, d - r);
+            quotientTone += ((q % (d + 3)) / (d + 3));
+            remainderWind += (r / d) - 0.5;
+            if (edge <= 1 || posmod(q + r + x - y, d) === 0) consonance++;
+          }
+
+          const north = cells[i - cols], south = cells[i + cols], west = cells[i - 1], east = cells[i + 1];
+          const carried = (north + south + west + east) * 0.155;
+          const self = voice * 0.43;
+          const invitation = consonance * 0.115 + (Math.sin(quotientTone * TAU + t * 0.021) + 1) * 0.055;
+          const newVoice = constrain(self + carried + invitation - Math.abs(remainderWind) * 0.035, 0, 1.7);
+          nextCells[i] = newVoice;
+
+          if (consonance > 1) choir++;
+          else silence++;
+          if (newVoice > bright) bright = newVoice;
+
+          const px = (x - 1) * step;
+          const py = (y - 1) * step;
+          const tone = (m.hue + quotientTone * 44 + consonance * 23 + t * 0.11) % 360;
+          const alpha = Math.min(0.92, 0.10 + newVoice * 0.46 + consonance * 0.09);
+          const size = step * (0.30 + Math.min(1.1, newVoice) * 0.66);
+
+          fill(tone, 46 + consonance * 12, 18 + newVoice * 50 + consonance * 7, alpha);
+          rect(px + step * 0.5 - size * 0.5, py + step * 0.5 - size * 0.5, size, size, Math.max(1, step * 0.18));
+
+          if (consonance >= 3) {
+            fill((tone + 58) % 360, 25, 96, 0.48);
+            circle(px + step * 0.5 + remainderWind * step * 0.9, py + step * 0.5, Math.max(1.5, step * 0.22));
+          }
+        }
+      }
+
+      const tmp = cells;
+      cells = nextCells;
+      nextCells = tmp;
+
+      drawStaff(m, bright);
+      if (frameCount % 12 === 0) updateCaption(choir, silence, bright);
+      t++;
+    }
+
+    function drawStaff(m, bright) {
+      stroke((m.hue + 170) % 360, 28, 70, 0.14 + Math.min(0.22, bright * 0.08));
+      strokeWeight(1);
+      for (let j = 0; j < m.divisors.length; j++) {
+        const d = m.divisors[j];
+        const y = ((t * (j + 1) * 0.37) + d * 13) % height;
+        const gap = 24 + (d % 19) * 5;
+        for (let x = -gap; x < width + gap; x += gap) {
+          line(x, y, x + gap * 0.34, y + Math.sin((x + t) * 0.01 + j) * 14);
+        }
+      }
+    }
+
+    function updateCaption(choir, silence, bright) {
+      const m = modes[mode];
+      const ratio = choir + silence === 0 ? 0 : choir / (choir + silence);
+      caption.innerHTML = `<b>quotient choir</b> · ${m.name} [${m.divisors.join(', ')}] · choir ${(ratio * 100).toFixed(1)}% · loudest ${bright.toFixed(2)} · remainders steer the field, quotients supply the pitch. click to change the divisors.`;
+    }
+
+    function posmod(n, m) { return ((n % m) + m) % m; }
+
+    function hash(x, y, salt) {
+      let n = (x * 374761393 + y * 668265263 + salt * 2246822519) >>> 0;
+      n = Math.imul(n ^ (n >>> 13), 1274126177) >>> 0;
+      return (n ^ (n >>> 16)) >>> 0;
+    }
+  </script>
+</body>
+</html>
