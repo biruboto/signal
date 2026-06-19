@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>kernel tide</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #07080b; color: #d8e2dc; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(680px, calc(100vw - 36px));
+      color: rgba(225,236,231,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em;
+      text-shadow: 0 1px 10px rgba(0,0,0,.75); pointer-events: none;
+    }
+    .readout b { color: rgba(247,218,143,.92); font-weight: 500; }
+    .readout .small { color: rgba(225,236,231,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cols, rows, cell, field, nextField, kernel, tick = 0, drift = 0;
+    const caption = document.getElementById('caption');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(7, min(14, floor(min(windowWidth, windowHeight) / 76)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      field = new Float32Array(cols * rows);
+      nextField = new Float32Array(cols * rows);
+      kernel = makeKernel(floor(random(1000000)) + 97);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const r = (x * 37 + y * 61 + (x ^ y) * 13) % 257;
+          field[idx(x,y)] = ((r / 257) * 0.55) + noise(x * .09, y * .09) * .45;
+        }
+      }
+      tick = 0;
+      drift = random(TWO_PI);
+    }
+
+    function makeKernel(seed) {
+      // Nine weights are residues of a tiny congruential orbit; the sum is deliberately not 1.
+      let z = seed;
+      const k = [];
+      for (let i = 0; i < 9; i++) {
+        z = (z * 73 + 41) % 997;
+        const sign = ((z + i) % 5 === 0) ? -1 : 1;
+        k.push(sign * (0.045 + (z % 89) / 760));
+      }
+      k[4] += 0.52;
+      return k;
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+
+    function draw() {
+      background(222, 31, 4.2, 0.18);
+      stepField();
+      const cx = cols * (0.5 + 0.18 * sin(tick * 0.006 + drift));
+      const cy = rows * (0.5 + 0.16 * cos(tick * 0.0051 + drift * 1.7));
+      let mass = 0, debt = 0, crossings = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const v = field[idx(x,y)];
+          mass += v;
+          if (v < 0) debt += -v;
+          const dx = x - cx, dy = y - cy;
+          const ring = sin(sqrt(dx*dx + dy*dy) * .38 - tick * .045);
+          const q = fract(abs(v) * 6.0 + ring * .33);
+          if (q < .035) crossings++;
+          const hue = (190 + 110 * q + 34 * ring + 360) % 360;
+          const sat = 20 + 70 * constrain(abs(v), 0, 1);
+          const bri = 5 + 82 * pow(q, 1.7) + 18 * max(0, ring);
+          fill(hue, sat, bri, 0.78);
+          const inset = cell * (0.08 + 0.35 * (1 - q));
+          rect(x * cell + inset/2, y * cell + inset/2, cell - inset, cell - inset, cell * .25);
+        }
+      }
+
+      const checksum = ((floor(abs(mass) * 1000) ^ (crossings * 131) ^ (tick * 17)) >>> 0).toString(36).padStart(6, '0').slice(-6);
+      caption.innerHTML = `<b>kernel tide</b> · a convolution forgets to conserve itself<br>` +
+        `mass ${mass.toFixed(2)} · negative remainder ${debt.toFixed(2)} · bright crossings ${crossings} · checksum ${checksum}<br>` +
+        `<span class="small">nine residue weights stir a toroidal field; what survives is the shape of the error.</span>`;
+      tick++;
+    }
+
+    function stepField() {
+      let n = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          let s = 0, p = 0;
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              s += field[idx(x + ox, y + oy)] * kernel[p++];
+            }
+          }
+          const tide = 0.034 * sin((x * 11 + y * 7 + tick) * .031) + 0.018 * cos((x - y) * .071 - tick * .027);
+          const folded = sin(s * 2.6 + tide) * 0.5 + 0.5;
+          nextField[n++] = lerp(field[idx(x,y)], folded, 0.42) - 0.0035;
+        }
+      }
+      const swap = field; field = nextField; nextField = swap;
+    }
+
+    function fract(v) { return v - Math.floor(v); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+    function mousePressed() { kernel = makeKernel(floor(random(1000000)) + 97); }
+  </script>
+</body>
+</html>
