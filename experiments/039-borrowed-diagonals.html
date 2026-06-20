@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>borrowed diagonals</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #06070a; color: #dbe7e2; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(720px, calc(100vw - 36px));
+      color: rgba(224,237,231,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em;
+      text-shadow: 0 1px 12px rgba(0,0,0,.8); pointer-events: none;
+    }
+    .readout b { color: rgba(161,217,255,.94); font-weight: 500; }
+    .readout .small { color: rgba(224,237,231,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cols, rows, cell, ledger, nextLedger, tick = 0, modulus = 29, slopeA = 5, slopeB = 12;
+    const caption = document.getElementById('caption');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(6, min(13, floor(min(windowWidth, windowHeight) / 82)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      ledger = new Int16Array(cols * rows);
+      nextLedger = new Int16Array(cols * rows);
+      const primes = [23, 29, 31, 37, 41, 43];
+      modulus = primes[floor(random(primes.length))];
+      slopeA = 2 + floor(random(modulus - 4));
+      slopeB = 2 + floor(random(modulus - 4));
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const diagonal = (x * slopeA + y * slopeB) % modulus;
+          const burr = floor(noise(x * .075, y * .075) * modulus);
+          ledger[idx(x,y)] = (diagonal + burr + ((x ^ y) % 7)) % modulus;
+        }
+      }
+      tick = 0;
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+
+    function draw() {
+      background(220, 34, 3.8, 0.19);
+      stepLedger();
+      let borrowed = 0, diagonalTax = 0, quiet = 0;
+      const pulse = 0.5 + 0.5 * sin(tick * 0.018);
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = ledger[idx(x,y)];
+          const a = ledger[idx(x + 1, y + 1)];
+          const b = ledger[idx(x - 1, y + 1)];
+          const debt = (a + b - here + modulus * 3) % modulus;
+          if (debt < here) borrowed++;
+          if ((x * slopeB - y * slopeA + tick) % modulus === 0) diagonalTax++;
+          if (debt === 0 || debt === modulus - 1) quiet++;
+
+          const seam = min(debt, modulus - debt) / (modulus * 0.5);
+          const stripe = ((x * slopeA + y * slopeB + tick) % modulus) / modulus;
+          const hue = (198 + 94 * stripe + 38 * sin(seam * PI + tick * .011)) % 360;
+          const sat = 28 + 62 * (1 - seam);
+          const bri = 8 + 68 * pow(1 - seam, 1.6) + 20 * pulse * (debt === 0 ? 1 : 0);
+          const alpha = 0.42 + 0.5 * (1 - seam);
+          fill(hue, sat, bri, alpha);
+          const shrink = cell * (0.1 + 0.58 * seam);
+          rect(x * cell + shrink/2, y * cell + shrink/2, cell - shrink, cell - shrink, cell * .35);
+        }
+      }
+
+      const checksum = ((borrowed * 257) ^ (quiet * 193) ^ (diagonalTax * 71) ^ (tick * modulus)) >>> 0;
+      caption.innerHTML = `<b>borrowed diagonals</b> · a lattice repays only along slantwise paths<br>` +
+        `mod ${modulus} · slopes ${slopeA}/${slopeB} · borrowed cells ${borrowed} · quiet seams ${quiet} · mark ${checksum.toString(36).slice(-6)}<br>` +
+        `<span class="small">each cell inherits two diagonal residues, then subtracts its own remainder; the visible bands are places where the loan almost closes.</span>`;
+      tick++;
+    }
+
+    function stepLedger() {
+      let p = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = ledger[idx(x,y)];
+          const d1 = ledger[idx(x + 1, y + 1)];
+          const d2 = ledger[idx(x - 1, y + 1)];
+          const side = ledger[idx(x + (tick % 3) - 1, y - 1)];
+          const carry = (d1 + d2 + side - here + modulus * 4) % modulus;
+          const taxLine = ((x * slopeB - y * slopeA + tick) % modulus === 0) ? 1 : 0;
+          nextLedger[p++] = (carry + taxLine + floor(noise(x * .03, y * .03, tick * .007) * 3)) % modulus;
+        }
+      }
+      const swap = ledger; ledger = nextLedger; nextLedger = swap;
+    }
+
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+    function mousePressed() { rebuild(); }
+  </script>
+</body>
+</html>
