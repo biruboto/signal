@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '040-sum-shadow', title: 'sum shadow', date: '2026-06-21' },
   { id: '039-borrowed-diagonals', title: 'borrowed diagonals', date: '2026-06-20' },
   { id: '038-kernel-tide', title: 'kernel tide', date: '2026-06-19' },
   { id: '037-quotient-choir', title: 'quotient choir', date: '2026-06-18' },

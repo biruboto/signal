@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sum shadow</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05070b; color: #dfe9e3; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(760px, calc(100vw - 36px));
+      color: rgba(226,238,231,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em;
+      text-shadow: 0 1px 14px rgba(0,0,0,.82); pointer-events: none;
+    }
+    .readout b { color: rgba(188,231,255,.96); font-weight: 500; }
+    .readout .small { color: rgba(226,238,231,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cell, cols, rows, field, nextField, shadow, walkers, tick = 0;
+    let modulus = 31, offsetA = 7, offsetB = 13;
+    const caption = document.getElementById('caption');
+    const primes = [23, 29, 31, 37, 41, 43];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(7, min(16, floor(min(windowWidth, windowHeight) / 70)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      field = new Int16Array(cols * rows);
+      nextField = new Int16Array(cols * rows);
+      shadow = new Float32Array(cols * rows);
+      modulus = primes[floor(random(primes.length))];
+      offsetA = 3 + floor(random(modulus - 6));
+      offsetB = 3 + floor(random(modulus - 6));
+      walkers = [];
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const grain = floor(noise(x * .06, y * .06) * modulus);
+          const braid = (x * offsetA + y * offsetB + (x & y)) % modulus;
+          field[idx(x,y)] = (grain + braid) % modulus;
+        }
+      }
+
+      const count = constrain(floor((cols * rows) / 210), 9, 26);
+      for (let i = 0; i < count; i++) {
+        walkers.push({
+          x: floor(random(cols)), y: floor(random(rows)),
+          salt: floor(random(modulus)),
+          dx: random([ -1, 1 ]), dy: random([ -1, 1 ])
+        });
+      }
+      tick = 0;
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+
+    function draw() {
+      background(224, 42, 3.5, 0.2);
+      stepField();
+      walkDeposits();
+
+      let exact = 0, near = 0, trace = 0;
+      const drift = 0.5 + 0.5 * sin(tick * .015);
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x,y);
+          const a = field[idx(x + offsetA, y + 1)];
+          const b = field[idx(x - 1, y + offsetB)];
+          const c = field[idx(x + 1, y - 1)];
+          const sum = (a + b + c) % modulus;
+          const local = field[i];
+          const gap = min((sum - local + modulus) % modulus, (local - sum + modulus) % modulus);
+          const s = shadow[i] = shadow[i] * 0.91 + (gap === 0 ? 1.6 : (modulus - gap) / modulus) * 0.16;
+          if (gap === 0) exact++;
+          if (gap <= 2) near++;
+          if (s > 0.62) trace++;
+
+          const filament = pow(1 - gap / (modulus * 0.5), 2.2);
+          const hue = (190 + 115 * (sum / modulus) + 28 * sin((x - y) * .05 + tick * .01)) % 360;
+          const sat = 32 + 58 * filament;
+          const bri = 6 + 68 * filament + 18 * min(1, s) + 9 * drift;
+          const alpha = 0.32 + 0.58 * min(1, s + filament);
+          fill(hue, sat, bri, alpha);
+
+          const w = cell * (0.18 + 0.78 * min(1, s + filament * .35));
+          if (((x + y + tick) % modulus) === 0) {
+            ellipse(x * cell + cell/2, y * cell + cell/2, w * 1.35, max(1.2, w * .28));
+          } else {
+            rect(x * cell + (cell - w)/2, y * cell + (cell - w)/2, w, w, cell * .42);
+          }
+        }
+      }
+
+      drawWalkers();
+      const checksum = ((exact * 997) ^ (near * 389) ^ (trace * 157) ^ (tick * modulus)) >>> 0;
+      caption.innerHTML = `<b>sum shadow</b> · each cell is haunted by the sum it nearly became<br>` +
+        `mod ${modulus} · offsets ${offsetA}/${offsetB} · exact shadows ${exact} · near-sums ${near} · residue trail ${trace} · mark ${checksum.toString(36).slice(-6)}<br>` +
+        `<span class="small">three remote residues vote on a value; the lattice keeps only the afterimage of agreement. click to reseed the witnesses.</span>`;
+      tick++;
+    }
+
+    function stepField() {
+      let p = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const here = field[idx(x,y)];
+          const north = field[idx(x, y - 1)];
+          const east = field[idx(x + 1, y)];
+          const diagonal = field[idx(x - 1, y + 1)];
+          const weather = floor(noise(x * .025, y * .025, tick * .006) * 3);
+          nextField[p++] = (here + north + east - diagonal + modulus * 2 + weather) % modulus;
+        }
+      }
+      const swap = field; field = nextField; nextField = swap;
+    }
+
+    function walkDeposits() {
+      for (const w of walkers) {
+        const turn = field[idx(w.x + w.dx, w.y)] - field[idx(w.x, w.y + w.dy)];
+        if ((turn + w.salt + tick) % 5 === 0) w.dx *= -1;
+        if ((turn + w.salt + tick) % 7 === 0) w.dy *= -1;
+        w.x = (w.x + w.dx + cols) % cols;
+        w.y = (w.y + w.dy + rows) % rows;
+        const i = idx(w.x, w.y);
+        field[i] = (field[i] + w.salt + tick) % modulus;
+        shadow[i] = min(1.9, shadow[i] + .42);
+      }
+    }
+
+    function drawWalkers() {
+      blendMode(ADD);
+      for (const w of walkers) {
+        fill(185, 35, 96, .45);
+        ellipse(w.x * cell + cell/2, w.y * cell + cell/2, cell * 1.2, cell * 1.2);
+      }
+      blendMode(BLEND);
+    }
+
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+    function mousePressed() { rebuild(); }
+  </script>
+</body>
+</html>
