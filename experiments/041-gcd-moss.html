@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gcd moss</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #030705; color: #dcefe4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(760px, calc(100vw - 36px));
+      color: rgba(221,239,228,.78); font-size: 12px; line-height: 1.45; letter-spacing: .02em;
+      text-shadow: 0 1px 15px rgba(0,0,0,.9); pointer-events: none;
+    }
+    .readout b { color: rgba(187,255,207,.97); font-weight: 500; }
+    .readout .small { color: rgba(221,239,228,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cell, cols, rows, rootX, rootY, moss, age, spores, tick = 0, modulus = 89;
+    const caption = document.getElementById('caption');
+    const primes = [71, 79, 83, 89, 97, 101, 103];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(6, min(15, floor(min(windowWidth, windowHeight) / 78)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      rootX = floor(cols * random(.32, .68));
+      rootY = floor(rows * random(.28, .72));
+      modulus = random(primes);
+      moss = new Float32Array(cols * rows);
+      age = new Uint16Array(cols * rows);
+      spores = [];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const g = gcd(abs(x - rootX) + 1, abs(y - rootY) + 1);
+          const seam = ((x * 13 + y * 21 + g * 8) % modulus) / modulus;
+          moss[idx(x,y)] = (g > 1 ? .12 + min(.55, log(g + 1) / 7) : 0) + .11 * noise(x * .08, y * .08) * seam;
+          age[idx(x,y)] = g;
+        }
+      }
+      const count = constrain(floor(cols * rows / 170), 12, 44);
+      for (let i = 0; i < count; i++) spores.push(makeSpore());
+      tick = 0;
+    }
+
+    function makeSpore() {
+      return {
+        x: floor(random(cols)), y: floor(random(rows)),
+        phase: random(TAU), hunger: random(.35, 1.15), trail: random(8, 28),
+        hue: random([92, 118, 146, 174]) + random(-10, 10)
+      };
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+    function gcd(a, b) { while (b) { const t = b; b = a % b; a = t; } return a || 1; }
+
+    function draw() {
+      background(144, 48, 2.5, 0.22);
+      let visible = 0, coprime = 0, bloom = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x,y);
+          const g = age[i];
+          const local = moss[i] = moss[i] * .986 + .006 * noise(x * .05, y * .05, tick * .012);
+          if (g === 1) coprime++;
+          if (local > .34) visible++;
+          if (local > .78) bloom++;
+
+          const pulse = .5 + .5 * sin(tick * .024 + g * .7 + (x - y) * .025);
+          const vein = g > 1 ? min(1, log(g + 1) / 3.2) : .04;
+          const euclid = ((x + 1) * (y + 1) + tick) % modulus;
+          const lit = euclid < g || abs(euclid - modulus) < g;
+          const h = (108 + 84 * vein + 18 * pulse) % 360;
+          const s = 28 + 58 * min(1, local + vein * .55);
+          const b = 5 + 62 * min(1, local * .9 + vein * .34) + (lit ? 18 : 0);
+          const a = .12 + .72 * min(1, local + vein * .38);
+          fill(h, s, b, a);
+          const r = cell * (.16 + .9 * min(1, local + vein * .28));
+          if (g === 1) {
+            rect(x * cell + cell * .42, y * cell + cell * .42, max(1, r * .22), max(1, r * .22), 2);
+          } else if (lit) {
+            ellipse(x * cell + cell / 2, y * cell + cell / 2, r * 1.3, r * .46);
+          } else {
+            rect(x * cell + (cell - r) / 2, y * cell + (cell - r) / 2, r, r, cell * .4);
+          }
+        }
+      }
+
+      stepSpores();
+      drawRoot();
+      const checksum = ((visible * 701) ^ (coprime * 431) ^ (bloom * 263) ^ (tick * modulus)) >>> 0;
+      caption.innerHTML = `<b>gcd moss</b> · common divisors behave like damp ground<br>` +
+        `root ${rootX},${rootY} · mod ${modulus} · coprime dry cells ${coprime} · visible moss ${visible} · blooms ${bloom} · mark ${checksum.toString(36).slice(-6)}<br>` +
+        `<span class="small">each cell measures its Euclidean kinship to a hidden root; spores prefer numbers with a shared factor. click to move the root.</span>`;
+      tick++;
+    }
+
+    function stepSpores() {
+      for (const sp of spores) {
+        let bestX = sp.x, bestY = sp.y, bestScore = -999;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = (sp.x + dx + cols) % cols;
+            const ny = (sp.y + dy + rows) % rows;
+            const g = age[idx(nx,ny)];
+            const score = (g > 1 ? log(g + 1) : -0.55) + moss[idx(nx,ny)] * .8 + noise(nx * .11, ny * .11, tick * .018 + sp.phase) * sp.hunger;
+            if (score > bestScore) { bestScore = score; bestX = nx; bestY = ny; }
+          }
+        }
+        sp.x = bestX; sp.y = bestY;
+        const i = idx(sp.x, sp.y);
+        moss[i] = min(1.5, moss[i] + .055 * sp.hunger + (age[i] > 1 ? .028 : -.006));
+        fill(sp.hue, 72, 92, .62);
+        ellipse(sp.x * cell + cell / 2, sp.y * cell + cell / 2, cell * .55, cell * .18);
+        sp.phase += .03;
+        if (random() < .002) Object.assign(sp, makeSpore());
+      }
+    }
+
+    function drawRoot() {
+      push();
+      blendMode(ADD);
+      fill(132, 55, 80, .45);
+      ellipse(rootX * cell + cell / 2, rootY * cell + cell / 2, cell * 4.2, cell * 4.2);
+      fill(76, 45, 96, .65);
+      ellipse(rootX * cell + cell / 2, rootY * cell + cell / 2, cell * 1.2, cell * 1.2);
+      pop();
+    }
+
+    function mousePressed() { rebuild(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+  </script>
+</body>
+</html>
