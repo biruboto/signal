@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '042-reciprocal-silt', title: 'reciprocal silt', date: '2026-06-23' },
   { id: '041-gcd-moss', title: 'gcd moss', date: '2026-06-22' },
   { id: '040-sum-shadow', title: 'sum shadow', date: '2026-06-21' },
   { id: '039-borrowed-diagonals', title: 'borrowed diagonals', date: '2026-06-20' },
