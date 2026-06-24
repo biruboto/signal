@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>markov brine</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #03060b; color: #e9f3ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(820px, calc(100vw - 36px));
+      color: rgba(233,243,255,.76); font-size: 12px; line-height: 1.45; letter-spacing: .02em;
+      text-shadow: 0 1px 16px rgba(0,0,0,.94); pointer-events: none;
+    }
+    .readout b { color: rgba(176,226,255,.98); font-weight: 500; }
+    .readout .small { color: rgba(233,243,255,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cell, cols, rows, brine, nextBrine, salt, bias, tick = 0, basin = 0;
+    const caption = document.getElementById('caption');
+    const kernels = [
+      [5, 8, 13, 21],
+      [7, 11, 18, 29],
+      [9, 14, 23, 37],
+      [12, 17, 25, 41]
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(5, min(13, floor(min(windowWidth, windowHeight) / 84)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      brine = new Float32Array(cols * rows);
+      nextBrine = new Float32Array(cols * rows);
+      salt = new Float32Array(cols * rows);
+      bias = random(kernels);
+      basin = floor(random(997));
+      tick = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = residue(x, y);
+          const well = pow(noise(x * .035, y * .035, basin), 2.2);
+          brine[i] = .15 + .72 * well * (r < 5 ? 1.45 : .75);
+          salt[i] = r === 0 ? .55 : .03 * noise(x * .2, y * .2);
+        }
+      }
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+    function residue(x, y) {
+      return abs((x * bias[0] + y * bias[1] + x * y * bias[2] + basin) % bias[3]);
+    }
+
+    function draw() {
+      background(215, 58, 3.5, 0.22);
+      tick++;
+      nextBrine.fill(0);
+      let crystallized = 0, liquid = 0, maxSalt = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = residue(x + floor(tick * .015), y - floor(tick * .01));
+          const b = brine[i];
+          const north = .17 + .23 * noise(x * .05, y * .05, tick * .004);
+          const east = .17 + (r % 5) * .032;
+          const south = .17 + ((x + y + r) % 7) * .019;
+          const west = max(.04, 1 - north - east - south);
+          const vapor = b * (.008 + .022 * noise(x * .02, y * .02, tick * .009));
+          const remain = b - vapor;
+
+          nextBrine[idx(x, y - 1)] += remain * north;
+          nextBrine[idx(x + 1, y)] += remain * east;
+          nextBrine[idx(x, y + 1)] += remain * south;
+          nextBrine[idx(x - 1, y)] += remain * west;
+          salt[i] = constrain(salt[i] * .994 + vapor * (r < 3 ? 1.8 : .72), 0, 1.8);
+        }
+      }
+
+      [brine, nextBrine] = [nextBrine, brine];
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = residue(x, y);
+          const s = salt[i];
+          const b = brine[i] = constrain(brine[i] * .998 + .003 * noise(x * .03, y * .03, tick * .006), 0, 1.4);
+          if (s > .32) crystallized++;
+          if (b > .2) liquid++;
+          maxSalt = max(maxSalt, s);
+
+          const seam = r < 3;
+          const hue = seam ? 190 + s * 24 : 210 + 36 * noise(x * .026, y * .026, tick * .004);
+          const sat = seam ? 18 + s * 32 : 52 + b * 18;
+          const bri = 5 + b * 38 + pow(s, .62) * 58;
+          fill(hue % 360, sat, bri, .42 + min(.5, s * .35 + b * .18));
+          rect(x * cell, y * cell, cell + .65, cell + .65);
+
+          if (s > .72 && cell > 6) {
+            fill(198, 8, 100, min(.82, (s - .55) * .7));
+            const d = cell * (.35 + min(1.4, s));
+            rect(x * cell + cell * .5 - d * .5, y * cell + cell * .5 - 1, d, 2);
+            rect(x * cell + cell * .5 - 1, y * cell + cell * .5 - d * .5, 2, d);
+          }
+        }
+      }
+
+      drawCurrents();
+      caption.innerHTML = `<b>markov brine</b> · kernel [${bias.join(', ')}], basin ${basin}<br>` +
+        `<span class="small">a transition matrix leaks probability into evaporation; ${crystallized} cells crystallized, ${liquid} still liquid, salinity peak ${maxSalt.toFixed(2)}</span>`;
+    }
+
+    function drawCurrents() {
+      blendMode(ADD);
+      noFill();
+      strokeWeight(max(1, cell * .11));
+      for (let k = 0; k < 130; k++) {
+        let x = (noise(k * 31, basin, tick * .003) * cols + k * 3) % cols;
+        let y = (noise(k * 47, basin, tick * .003) * rows + tick * .012) % rows;
+        stroke(190 + (k % 5) * 9, 42, 70, .045);
+        beginShape();
+        for (let step = 0; step < 16; step++) {
+          curveVertex(x * cell + cell * .5, y * cell + cell * .5);
+          const r = residue(floor(x), floor(y));
+          x += (r % 3) - .85 + .35 * sin(tick * .01 + k);
+          y += ((r % 5) - 2) * .22 + .45;
+        }
+        endShape();
+      }
+      blendMode(BLEND);
+    }
+
+    function mousePressed() { basin = (basin + 137) % 997; rebuild(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+  </script>
+</body>
+</html>
