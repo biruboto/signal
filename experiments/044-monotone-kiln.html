@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>monotone kiln</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05040a; color: #f4efe4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(860px, calc(100vw - 36px));
+      color: rgba(244,239,228,.76); font-size: 12px; line-height: 1.45; letter-spacing: .025em;
+      text-shadow: 0 1px 18px rgba(0,0,0,.92); pointer-events: none;
+    }
+    .readout b { color: rgba(255,211,139,.98); font-weight: 500; }
+    .readout .small { color: rgba(244,239,228,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cell, cols, rows, heat, nextHeat, clay, stamp, tick = 0, rule, ledger;
+    const caption = document.getElementById('caption');
+    const rules = [
+      { m: 31, a: 5, b: 17, c: 11, name: '31 / fivefold anneal' },
+      { m: 37, a: 7, b: 19, c: 13, name: '37 / prime draft' },
+      { m: 41, a: 6, b: 23, c: 17, name: '41 / slow carry' },
+      { m: 43, a: 9, b: 25, c: 7, name: '43 / oblique firing' }
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(6, min(15, floor(min(windowWidth, windowHeight) / 74)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      heat = new Float32Array(cols * rows);
+      nextHeat = new Float32Array(cols * rows);
+      clay = new Float32Array(cols * rows);
+      stamp = new Uint8Array(cols * rows);
+      ledger = { sealed: 0, reheated: 0, seam: 0 };
+      rule = random(rules);
+      tick = 0;
+
+      const seed = floor(random(10000));
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = residue(x, y, seed);
+          const basin = pow(noise(x * .045, y * .045, seed * .01), 1.7);
+          heat[i] = .12 + .78 * basin * (r < rule.m * .22 ? 1.18 : .72);
+          clay[i] = .18 + .72 * noise(x * .025 + 20, y * .025 - 11, seed * .02);
+          stamp[i] = r;
+        }
+      }
+    }
+
+    function idx(x, y) { return ((y + rows) % rows) * cols + ((x + cols) % cols); }
+    function residue(x, y, s = 0) {
+      const v = x * rule.a + y * rule.b + (x ^ y) * rule.c + floor(x * y / max(1, rule.a)) + s;
+      return ((v % rule.m) + rule.m) % rule.m;
+    }
+    function monotoneGate(v, r) {
+      const q = (r + 1) / rule.m;
+      return v > q ? v - (v - q) * .045 : v + (q - v) * .012;
+    }
+
+    function draw() {
+      background(252, 52, 3.2, .18);
+      tick++;
+      nextHeat.fill(0);
+      ledger.sealed = 0; ledger.reheated = 0; ledger.seam = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = stamp[i];
+          const draft = (sin((x * rule.a + y * rule.b + tick) * .017) + 1) * .5;
+          const n = heat[idx(x, y - 1)], e = heat[idx(x + 1, y)], s = heat[idx(x, y + 1)], w = heat[idx(x - 1, y)];
+          const chosen = r % 4 === 0 ? n : r % 4 === 1 ? e : r % 4 === 2 ? s : w;
+          const kiln = .62 * heat[i] + .28 * chosen + .10 * noise(x * .08, y * .08, tick * .01);
+          let h = monotoneGate(kiln, (r + floor(tick * .035)) % rule.m);
+          if ((r + tick) % rule.m === 0) h = min(1, h + .20 + .18 * draft);
+          h *= .988;
+          nextHeat[i] = h;
+
+          clay[i] = constrain(clay[i] + (h - .48) * .006 - .0015, 0, 1);
+          if (clay[i] > .76 && h < .43) ledger.sealed++;
+          if (h > .72 && clay[i] < .38) ledger.reheated++;
+          if (abs(h - clay[i]) < .018) ledger.seam++;
+        }
+      }
+      [heat, nextHeat] = [nextHeat, heat];
+
+      const wobble = .45 + .55 * sin(tick * .009);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const h = heat[i];
+          const c = clay[i];
+          const r = stamp[i];
+          const seam = abs(h - c);
+          const hue = 24 + 42 * h + 205 * pow(1 - c, 3) + (r % 5) * 2.8;
+          const sat = 38 + 48 * h + 12 * wobble;
+          const bri = 6 + 74 * max(h, c * .68) + (seam < .025 ? 18 : 0);
+          fill(hue % 360, sat, bri, .82);
+          const inset = seam < .02 ? 0 : map(r % 7, 0, 6, 0.5, cell * .24);
+          rect(x * cell + inset, y * cell + inset, cell - inset * 2 + .7, cell - inset * 2 + .7, seam < .02 ? cell * .34 : 1.5);
+          if (r === (tick % rule.m) && h > .55) {
+            fill(45, 18, 98, .55);
+            circle(x * cell + cell * .5, y * cell + cell * .5, max(1.2, cell * .20));
+          }
+        }
+      }
+
+      caption.innerHTML = `<b>monotone kiln</b> · ${rule.name} · sealed ${ledger.sealed} · reheated ${ledger.reheated} · seams ${ledger.seam}<br><span class="small">each cell may cool only toward its assigned residue threshold; heat returns as a modular exception, vitrifying disagreement into clay.</span>`;
+    }
+
+    function mousePressed() { rebuild(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+  </script>
+</body>
+</html>

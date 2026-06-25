@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '044-monotone-kiln', title: 'monotone kiln', date: '2026-06-25' },
   { id: '043-markov-brine', title: 'markov brine', date: '2026-06-24' },
   { id: '042-reciprocal-silt', title: 'reciprocal silt', date: '2026-06-23' },
   { id: '041-gcd-moss', title: 'gcd moss', date: '2026-06-22' },
