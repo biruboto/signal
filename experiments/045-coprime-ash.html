@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>coprime ash</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #04050a; color: #efe9dc; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    .readout {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(900px, calc(100vw - 36px));
+      color: rgba(239,233,220,.75); font-size: 12px; line-height: 1.45; letter-spacing: .025em;
+      text-shadow: 0 1px 18px rgba(0,0,0,.92); pointer-events: none;
+    }
+    .readout b { color: rgba(190,224,255,.98); font-weight: 500; }
+    .readout .small { color: rgba(239,233,220,.48); }
+  </style>
+</head>
+<body>
+  <div id="caption" class="readout"></div>
+  <script>
+    let cell, cols, rows, ash, nextAsh, debt, tick = 0, rule, walkers = [], ledger;
+    const caption = document.getElementById('caption');
+    const rules = [
+      { p: 29, q: 47, wind: 3, name: '29×47 / thin witness' },
+      { p: 31, q: 43, wind: 5, name: '31×43 / blue remainder' },
+      { p: 37, q: 41, wind: 7, name: '37×41 / near twin draft' },
+      { p: 23, q: 53, wind: 11, name: '23×53 / long sieve' }
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      colorMode(HSB, 360, 100, 100, 1);
+      noStroke();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = max(5, min(13, floor(min(windowWidth, windowHeight) / 82)));
+      cols = ceil(width / cell);
+      rows = ceil(height / cell);
+      ash = new Float32Array(cols * rows);
+      nextAsh = new Float32Array(cols * rows);
+      debt = new Float32Array(cols * rows);
+      rule = random(rules);
+      tick = 0;
+      walkers = [];
+      const count = floor((cols + rows) * 1.15);
+      for (let i = 0; i < count; i++) {
+        walkers.push({
+          x: random(cols), y: random(rows),
+          v: random([1, -1]) * random(.12, .48),
+          phase: random(TAU), salt: floor(random(9999))
+        });
+      }
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const r = residue(x, y, 0);
+          ash[i] = (r === 1 || r === rule.p - 1) ? random(.10, .38) : random(.01, .08);
+          debt[i] = noise(x * .07, y * .07) * .35;
+        }
+      }
+    }
+
+    function idx(x, y) { return ((floor(y) + rows) % rows) * cols + ((floor(x) + cols) % cols); }
+    function gcd(a, b) { a = abs(floor(a)); b = abs(floor(b)); while (b) { const t = b; b = a % b; a = t; } return a || 1; }
+    function residue(x, y, t) {
+      const a = (x * x + rule.wind * y + t) % rule.p;
+      const b = (y * y + rule.wind * x - t) % rule.q;
+      return gcd(a + rule.p, b + rule.q);
+    }
+    function coprimeGate(x, y) {
+      const a = x + tick * .07 + floor(7 * noise(y * .03, tick * .006));
+      const b = y - tick * .05 + floor(7 * noise(x * .03 + 20, tick * .006));
+      return gcd(a * rule.wind + rule.p, b * (rule.wind + 2) + rule.q) === 1;
+    }
+
+    function draw() {
+      background(230, 44, 4, .24);
+      tick++;
+      nextAsh.fill(0);
+      ledger = { admitted: 0, refused: 0, bright: 0 };
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const n = ash[idx(x, y - 1)], e = ash[idx(x + 1, y)], s = ash[idx(x, y + 1)], w = ash[idx(x - 1, y)];
+          const drift = (n + e + s + w) * .19 + ash[i] * .22;
+          const sieve = coprimeGate(x, y);
+          const r = residue(x, y, tick);
+          let v = drift + debt[i] * .025;
+          if (sieve) { v += .026 + .05 / (1 + r); ledger.admitted++; }
+          else { debt[i] = min(1, debt[i] + .012 + .04 / r); v *= .955; ledger.refused++; }
+          if (r > 1 && tick % r === 0) { v *= .76; debt[i] += .018; }
+          debt[i] *= .992;
+          nextAsh[i] = constrain(v, 0, 1);
+        }
+      }
+      [ash, nextAsh] = [nextAsh, ash];
+
+      walkers.forEach(w => {
+        const gx = floor(w.x), gy = floor(w.y), i = idx(gx, gy);
+        const open = coprimeGate(gx, gy);
+        const turn = noise(w.salt, tick * .01) - .5;
+        w.phase += turn * .42 + (open ? .018 : -.055);
+        w.x += cos(w.phase) * (open ? .34 : .16) + w.v;
+        w.y += sin(w.phase) * (open ? .34 : .16) + .20 * sin(tick * .011 + w.salt);
+        if (w.x < 0) w.x += cols; if (w.x >= cols) w.x -= cols;
+        if (w.y < 0) w.y += rows; if (w.y >= rows) w.y -= rows;
+        ash[i] = min(1, ash[i] + (open ? .20 : .045));
+        debt[i] = min(1, debt[i] + (open ? .01 : .08));
+      });
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = idx(x, y);
+          const a = ash[i], d = debt[i], r = residue(x, y, tick);
+          if (a > .62) ledger.bright++;
+          const open = coprimeGate(x, y);
+          const hue = open ? 194 + 50 * d + 18 * sin(a * TAU) : 260 + 54 * d;
+          const sat = 18 + 58 * d + 26 * a;
+          const bri = 5 + 78 * pow(a, .72) + (open ? 6 : -2);
+          fill(hue % 360, sat, bri, .78);
+          const inset = open ? map(r % 9, 0, 8, .4, cell * .18) : cell * (.20 + .22 * d);
+          rect(x * cell + inset, y * cell + inset, cell - inset * 2 + .7, cell - inset * 2 + .7, open ? cell * .42 : 1);
+          if (!open && d > .62) {
+            fill(34, 65, 96, .30 * d);
+            circle(x * cell + cell * .5, y * cell + cell * .5, max(1.3, cell * .35 * d));
+          }
+        }
+      }
+
+      caption.innerHTML = `<b>coprime ash</b> · ${rule.name} · admitted ${ledger.admitted} · refused ${ledger.refused} · bright ash ${ledger.bright}<br><span class="small">falling ash only settles where two moving coordinates share no factor; every failed divisibility test remains as violet debt.</span>`;
+    }
+
+    function mousePressed() { rebuild(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); rebuild(); }
+  </script>
+</body>
+</html>
