@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>residue thermocline</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #07090d; color: #d7e3dd; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(640px, calc(100vw - 36px));
+      color: rgba(223, 238, 230, 0.78); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em;
+      text-shadow: 0 1px 10px rgba(0,0,0,0.72); user-select: none;
+    }
+    #caption b { color: rgba(247, 224, 166, 0.92); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>residue thermocline</b> · modular strata exchange heat only when their remainders agree; click to reseed the cold current.</div>
+  <script>
+    let layers = [];
+    let grains = [];
+    let seedValue = 46027;
+    let t = 0;
+    let bandCount = 17;
+    let mods = [];
+    let caption;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      reseed(seedValue);
+    }
+
+    function reseed(s) {
+      randomSeed(s);
+      noiseSeed(s);
+      t = 0;
+      bandCount = Math.max(9, Math.min(25, Math.floor(height / 42)));
+      const primes = [5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97];
+      mods = [];
+      for (let i = 0; i < bandCount; i++) mods.push(primes[(i * 5 + Math.floor(s / 17)) % primes.length]);
+      layers = [];
+      for (let y = 0; y < bandCount; y++) {
+        const row = [];
+        for (let x = 0; x < 96; x++) {
+          const m = mods[y];
+          const residue = (x * x + y * 13 + s) % m;
+          row.push({ heat: residue / m, debt: 0, residue });
+        }
+        layers.push(row);
+      }
+      grains = [];
+      const n = Math.floor(width * height / 5200);
+      for (let i = 0; i < n; i++) {
+        grains.push({
+          x: random(width), y: random(height),
+          r: random([1, 2, 3, 5, 8, 13]),
+          phase: random(TAU),
+          carry: random(0.2, 1)
+        });
+      }
+      if (caption) caption.innerHTML = `<b>residue thermocline</b> · ${bandCount} strata, moduli ${mods.slice(0, 7).join('/')}${mods.length > 7 ? '/…' : ''}; agreements rise as warm filaments, disagreements sink as blue debt.`;
+    }
+
+    function draw() {
+      background(218, 38, 5, 0.18);
+      t += 0.006;
+      stepExchange();
+      drawBands();
+      drawCurrents();
+      drawSoundings();
+    }
+
+    function stepExchange() {
+      const cols = layers[0].length;
+      for (let y = 0; y < bandCount - 1; y++) {
+        const m0 = mods[y], m1 = mods[y + 1];
+        for (let x = 0; x < cols; x++) {
+          const a = layers[y][x];
+          const b = layers[y + 1][(x + y + Math.floor(frameCount / 9)) % cols];
+          const agree = ((a.residue + frameCount) % m0) % Math.min(m0, m1) === ((b.residue + y) % m1) % Math.min(m0, m1);
+          const flux = agree ? 0.018 : -0.004;
+          a.heat = constrain(a.heat + flux * (1 - a.heat) - 0.003 * b.heat, 0, 1.2);
+          b.heat = constrain(b.heat + flux * 0.55 - 0.002, 0, 1.2);
+          a.debt = constrain(a.debt * 0.985 + (agree ? 0 : 0.018), 0, 1);
+          b.debt = constrain(b.debt * 0.988 + (agree ? 0.006 : 0.012), 0, 1);
+          if (frameCount % 37 === 0) {
+            a.residue = (a.residue + x + y + 1) % m0;
+            b.residue = (b.residue + a.residue + 1) % m1;
+          }
+        }
+      }
+    }
+
+    function drawBands() {
+      noStroke();
+      const h = height / bandCount;
+      const cols = layers[0].length;
+      const w = width / cols;
+      for (let y = 0; y < bandCount; y++) {
+        for (let x = 0; x < cols; x++) {
+          const cell = layers[y][x];
+          const n = noise(x * 0.04, y * 0.11, t);
+          const hue = lerp(202, 42, Math.pow(cell.heat, 1.7)) + n * 18;
+          const sat = 38 + cell.debt * 42;
+          const bri = 9 + cell.heat * 58 + n * 10;
+          fill(hue, sat, bri, 0.64);
+          rect(x * w, y * h, w + 1, h + 1);
+        }
+        stroke(175, 18, 88, 0.11);
+        line(0, (y + 1) * h, width, (y + 1) * h);
+      }
+    }
+
+    function drawCurrents() {
+      blendMode(ADD);
+      noFill();
+      for (let i = 0; i < grains.length; i++) {
+        const g = grains[i];
+        const band = constrain(Math.floor(g.y / (height / bandCount)), 0, bandCount - 1);
+        const mod = mods[band];
+        const drift = ((Math.floor(g.x / 13) + frameCount + band) % mod) / mod;
+        const warm = drift < 0.13;
+        g.x += (noise(g.y * 0.006, t + g.phase) - 0.45) * 2.7 + (warm ? 0.8 : -0.15);
+        g.y += (warm ? -1.15 : 0.34) * g.carry + sin(t * 8 + g.phase) * 0.28;
+        if (g.y < -12 || g.y > height + 12 || g.x < -16 || g.x > width + 16) {
+          g.x = random(width); g.y = warm ? height + random(20) : random(height); g.phase = random(TAU);
+        }
+        stroke(warm ? 42 : 204, warm ? 54 : 44, warm ? 92 : 72, warm ? 0.21 : 0.11);
+        strokeWeight(warm ? 1.4 : 0.8);
+        const len = warm ? 18 + g.r * 2 : 7 + g.r;
+        line(g.x, g.y, g.x + cos(g.phase + t) * len, g.y + (warm ? -len : len * 0.45));
+      }
+      blendMode(BLEND);
+    }
+
+    function drawSoundings() {
+      const cols = 11;
+      noFill();
+      for (let i = 0; i < cols; i++) {
+        const x = (i + 0.5) * width / cols;
+        beginShape();
+        stroke(88, 28, 86, 0.22);
+        strokeWeight(1);
+        for (let y = 0; y < height; y += 12) {
+          const band = constrain(Math.floor(y / (height / bandCount)), 0, bandCount - 1);
+          const col = Math.floor(map(x, 0, width, 0, layers[band].length - 1));
+          const h = layers[band][col].heat;
+          vertex(x + sin(y * 0.017 + t * 9 + i) * (4 + h * 28), y);
+        }
+        endShape();
+      }
+    }
+
+    function mousePressed() {
+      seedValue = (seedValue * 1103515245 + 12345 + Math.floor(mouseX * 31 + mouseY)) >>> 0;
+      reseed(seedValue);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      reseed(seedValue);
+    }
+  </script>
+</body>
+</html>
