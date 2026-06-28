@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '047-divisor-wind', title: 'divisor wind', date: '2026-06-28' },
   { id: '046-residue-thermocline', title: 'residue thermocline', date: '2026-06-27' },
   { id: '045-coprime-ash', title: 'coprime ash', date: '2026-06-26' },
   { id: '044-monotone-kiln', title: 'monotone kiln', date: '2026-06-25' },

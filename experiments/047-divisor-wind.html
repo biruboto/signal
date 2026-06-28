@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>divisor wind</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #06070b; color: #dbe7df; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(720px, calc(100vw - 36px));
+      color: rgba(222, 236, 228, 0.78); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.8); user-select: none;
+    }
+    #caption b { color: rgba(169, 222, 255, 0.95); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>divisor wind</b> · integers shed small factors into a moving pressure field; common divisors briefly become weather.</div>
+  <script>
+    let field = [];
+    let motes = [];
+    let cols = 0, rows = 0, cell = 18;
+    let seedValue = 47029;
+    let t = 0;
+    const smallPrimes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
+    let caption;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      reseed(seedValue);
+    }
+
+    function reseed(s) {
+      randomSeed(s);
+      noiseSeed(s);
+      t = 0;
+      cell = constrain(Math.floor(Math.min(width, height) / 42), 12, 24);
+      cols = Math.ceil(width / cell) + 2;
+      rows = Math.ceil(height / cell) + 2;
+      field = new Array(cols * rows).fill(0).map((_, i) => {
+        const x = i % cols, y = Math.floor(i / cols);
+        const n = 84 + ((x * 37 + y * 61 + s) % 713);
+        return { n, q: 0, hue: factorHue(n), last: 1 };
+      });
+      motes = [];
+      const count = Math.floor(width * height / 7200);
+      for (let i = 0; i < count; i++) {
+        const p = random(smallPrimes);
+        motes.push({
+          x: random(width), y: random(height), p,
+          n: Math.floor(random(180, 2400)), phase: random(TAU), age: random(1000)
+        });
+      }
+      if (caption) caption.innerHTML = `<b>divisor wind</b> · ${motes.length} integer motes test ${cols * rows} cells; gusts turn only where gcd(mote, cell) exceeds a private threshold. click to change the arithmetic weather.`;
+    }
+
+    function draw() {
+      background(224, 42, 5, 0.2);
+      t += 0.007;
+      evaporateField();
+      moveMotes();
+      drawField();
+      drawMotes();
+      drawIsobars();
+    }
+
+    function idx(x, y) { return y * cols + x; }
+
+    function factorHue(n) {
+      let sum = 0, count = 0;
+      for (const p of smallPrimes) {
+        if (n % p === 0) { sum += p; count++; }
+      }
+      return count ? (188 + sum * 9) % 360 : 228;
+    }
+
+    function divisorVector(n, g, phase) {
+      let ax = 0, ay = 0;
+      for (let i = 0; i < smallPrimes.length; i++) {
+        const p = smallPrimes[i];
+        if (n % p === 0) {
+          const a = (p * 0.73 + phase + (g % (p + 3)) * 0.19);
+          const weight = (g % p === 0 ? 1.9 : 0.55) / Math.sqrt(p);
+          ax += Math.cos(a) * weight;
+          ay += Math.sin(a) * weight;
+        }
+      }
+      return { ax, ay };
+    }
+
+    function evaporateField() {
+      for (const f of field) {
+        f.q *= 0.965;
+        if (frameCount % 53 === 0) {
+          f.n = 60 + ((f.n * 17 + f.last * 31 + frameCount) % 997);
+          f.hue = factorHue(f.n);
+        }
+      }
+    }
+
+    function moveMotes() {
+      for (const m of motes) {
+        const cx = constrain(Math.floor(m.x / cell), 0, cols - 1);
+        const cy = constrain(Math.floor(m.y / cell), 0, rows - 1);
+        const f = field[idx(cx, cy)];
+        const g = gcd(m.n, f.n);
+        f.last = g;
+        if (g > m.p) f.q = constrain(f.q + Math.log2(g) * 0.045, 0, 1.8);
+        const v = divisorVector(m.n, g, m.phase + t * 4);
+        const curl = noise(m.x * 0.004, m.y * 0.004, t) * TAU * 2;
+        const gate = g > m.p ? 1.35 : 0.42;
+        m.x += v.ax * gate + Math.cos(curl) * 0.65;
+        m.y += v.ay * gate + Math.sin(curl) * 0.65;
+        m.age++;
+        if (m.age % 97 === 0) m.n = 72 + ((m.n + g * 43 + m.p * 17) % 4096);
+        if (m.x < -20) m.x = width + 12;
+        if (m.x > width + 20) m.x = -12;
+        if (m.y < -20) m.y = height + 12;
+        if (m.y > height + 20) m.y = -12;
+      }
+    }
+
+    function drawField() {
+      noStroke();
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const f = field[idx(x, y)];
+          const pulse = Math.min(1, f.q);
+          const h = (f.hue + pulse * 42 + noise(x * 0.1, y * 0.1, t) * 18) % 360;
+          fill(h, 38 + pulse * 36, 7 + pulse * 58, 0.12 + pulse * 0.42);
+          rect(x * cell - cell, y * cell - cell, cell + 1, cell + 1);
+        }
+      }
+    }
+
+    function drawMotes() {
+      blendMode(ADD);
+      for (const m of motes) {
+        const cx = constrain(Math.floor(m.x / cell), 0, cols - 1);
+        const cy = constrain(Math.floor(m.y / cell), 0, rows - 1);
+        const f = field[idx(cx, cy)];
+        const g = gcd(m.n, f.n);
+        const bright = g > m.p;
+        stroke(bright ? 42 : 204, bright ? 62 : 32, bright ? 96 : 66, bright ? 0.34 : 0.14);
+        strokeWeight(bright ? 1.6 : 0.8);
+        const a = Math.atan2(divisorVector(m.n, g, m.phase).ay, divisorVector(m.n, g, m.phase).ax);
+        line(m.x, m.y, m.x - Math.cos(a) * (bright ? 20 : 9), m.y - Math.sin(a) * (bright ? 20 : 9));
+        noStroke();
+        fill(bright ? 48 : 194, bright ? 46 : 28, 90, bright ? 0.25 : 0.1);
+        circle(m.x, m.y, bright ? 3.2 : 1.8);
+      }
+      blendMode(BLEND);
+    }
+
+    function drawIsobars() {
+      noFill();
+      for (let k = 0; k < 9; k++) {
+        beginShape();
+        stroke(184 + k * 5, 22, 82, 0.10);
+        strokeWeight(1);
+        for (let x = -20; x <= width + 20; x += 14) {
+          const y = (k + 0.5) * height / 9 + Math.sin(x * 0.011 + t * 5 + k) * 18;
+          const cx = constrain(Math.floor(x / cell), 0, cols - 1);
+          const cy = constrain(Math.floor(y / cell), 0, rows - 1);
+          const lift = field[idx(cx, cy)].q * 22;
+          vertex(x, y - lift);
+        }
+        endShape();
+      }
+    }
+
+    function gcd(a, b) {
+      a = Math.abs(a); b = Math.abs(b);
+      while (b) { const r = a % b; a = b; b = r; }
+      return a || 1;
+    }
+
+    function mousePressed() {
+      seedValue = (seedValue * 1664525 + 1013904223 + Math.floor(mouseX * 13 + mouseY * 7)) >>> 0;
+      reseed(seedValue);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      reseed(seedValue);
+    }
+  </script>
+</body>
+</html>
