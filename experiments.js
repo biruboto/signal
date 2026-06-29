@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '048-convergent-hail', title: 'convergent hail', date: '2026-06-29' },
   { id: '047-divisor-wind', title: 'divisor wind', date: '2026-06-28' },
   { id: '046-residue-thermocline', title: 'residue thermocline', date: '2026-06-27' },
   { id: '045-coprime-ash', title: 'coprime ash', date: '2026-06-26' },

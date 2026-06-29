@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>convergent hail</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05070b; color: #dfe8e4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(760px, calc(100vw - 36px));
+      color: rgba(224, 236, 232, 0.78); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.85); user-select: none;
+    }
+    #caption b { color: rgba(174, 223, 255, 0.96); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>convergent hail</b> · falling fractions strike a continued-fraction sieve; near misses leave cold rings, exact convergents briefly ignite.</div>
+  <script>
+    let stones = [];
+    let wells = [];
+    let scars = [];
+    let seedValue = 48029;
+    let t = 0;
+    let caption;
+    const wellCount = 9;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      reseed(seedValue);
+    }
+
+    function reseed(s) {
+      randomSeed(s);
+      noiseSeed(s);
+      t = 0;
+      wells = [];
+      scars = [];
+      stones = [];
+      for (let i = 0; i < wellCount; i++) {
+        const x = width * (0.12 + 0.76 * ((i * 37 + 11) % wellCount) / (wellCount - 1));
+        const y = height * (0.18 + 0.62 * noise(i * 0.71, s * 0.00001));
+        const target = 1.18 + i * 0.23 + noise(i, s) * 0.65;
+        wells.push({ x, y, target, phase: random(TAU), charge: 0, hits: 0 });
+      }
+      const count = Math.floor(width * height / 5600);
+      for (let i = 0; i < count; i++) spawnStone(random(width), random(-height, height), i);
+      if (caption) caption.innerHTML = `<b>convergent hail</b> · ${stones.length} fractions fall through ${wells.length} irrational wells; Euclid measures the distance between accident and approximation. click to reseed the storm.`;
+    }
+
+    function spawnStone(x, y, salt) {
+      const q = Math.floor(random(17, 211));
+      const p = Math.floor(q * random(0.62, 2.75)) + 1;
+      stones.push({ x, y, p, q, vx: random(-0.45, 0.45), vy: random(0.45, 1.8), salt, trail: [] });
+    }
+
+    function draw() {
+      background(222, 48, 5, 0.22);
+      t += 0.006;
+      driftWells();
+      drawScars();
+      drawWells();
+      fallStones();
+      drawThreadField();
+    }
+
+    function driftWells() {
+      for (let i = 0; i < wells.length; i++) {
+        const w = wells[i];
+        w.x += Math.cos(t * 1.7 + w.phase) * 0.18;
+        w.y += Math.sin(t * 1.3 + w.phase * 1.4) * 0.12;
+        w.charge *= 0.972;
+      }
+    }
+
+    function fallStones() {
+      blendMode(ADD);
+      for (const s of stones) {
+        let pullX = 0, pullY = 0, nearest = null, best = 99;
+        const value = s.p / s.q;
+        for (const w of wells) {
+          const approx = convergentError(value, w.target);
+          const d = dist(s.x, s.y, w.x, w.y);
+          const gate = Math.exp(-d * d / 42000) / (0.015 + approx.err);
+          pullX += (w.x - s.x) * gate * 0.0009;
+          pullY += (w.y - s.y) * gate * 0.0009;
+          if (approx.err < best) { best = approx.err; nearest = { w, approx }; }
+        }
+        s.vx += pullX + (noise(s.x * 0.004, s.y * 0.004, t + s.salt) - 0.5) * 0.025;
+        s.vy += pullY + 0.006;
+        s.vx *= 0.996;
+        s.vy = constrain(s.vy * 0.998, -1.2, 2.7);
+        s.x += s.vx;
+        s.y += s.vy;
+        s.trail.push([s.x, s.y]);
+        if (s.trail.length > 12) s.trail.shift();
+        if (nearest && nearest.approx.err < 0.0028 && dist(s.x, s.y, nearest.w.x, nearest.w.y) < 110) {
+          strike(s, nearest.w, nearest.approx);
+        }
+        drawStone(s, nearest ? nearest.approx : { err: 0.1, depth: 1 });
+        if (s.y > height + 40 || s.x < -60 || s.x > width + 60) resetStone(s);
+      }
+      blendMode(BLEND);
+    }
+
+    function strike(s, w, approx) {
+      w.charge = constrain(w.charge + 0.35 + approx.depth * 0.06, 0, 3.2);
+      w.hits++;
+      scars.push({ x: s.x, y: s.y, r: 8 + approx.depth * 9, hue: 182 + approx.depth * 13, life: 1, p: s.p, q: s.q });
+      s.p = (s.p + w.hits * 7 + approx.depth * 11) % 337 + 1;
+      s.q = (s.q + w.hits * 13 + approx.depth * 5) % 229 + 17;
+      s.vx += random(-1.6, 1.6);
+      s.vy -= random(1.0, 2.4);
+    }
+
+    function drawStone(s, approx) {
+      const heat = constrain(1 - approx.err * 80, 0, 1);
+      noFill();
+      stroke(196 + heat * 58, 34 + heat * 40, 62 + heat * 36, 0.12 + heat * 0.24);
+      strokeWeight(1);
+      beginShape();
+      for (const pt of s.trail) vertex(pt[0], pt[1]);
+      endShape();
+      noStroke();
+      fill(205 + heat * 52, 28 + heat * 48, 78 + heat * 20, 0.18 + heat * 0.36);
+      circle(s.x, s.y, 2.2 + heat * 3.8);
+    }
+
+    function drawWells() {
+      noFill();
+      for (const w of wells) {
+        const pulse = w.charge;
+        for (let k = 0; k < 4; k++) {
+          stroke(188 + k * 10 + pulse * 16, 38, 64 + pulse * 10, 0.10 + pulse * 0.045);
+          strokeWeight(1);
+          const r = 26 + k * 18 + pulse * 13 + Math.sin(t * 5 + w.phase + k) * 3;
+          ellipse(w.x, w.y, r * 1.7, r);
+        }
+        stroke(44, 55, 95, 0.10 + pulse * 0.09);
+        line(w.x - 5, w.y, w.x + 5, w.y);
+        line(w.x, w.y - 5, w.x, w.y + 5);
+      }
+    }
+
+    function drawScars() {
+      for (let i = scars.length - 1; i >= 0; i--) {
+        const c = scars[i];
+        c.life *= 0.965;
+        noFill();
+        stroke(c.hue, 46, 88, c.life * 0.22);
+        strokeWeight(1.2);
+        circle(c.x, c.y, c.r * (2 - c.life));
+        if (c.life < 0.025) scars.splice(i, 1);
+      }
+    }
+
+    function drawThreadField() {
+      noFill();
+      strokeWeight(1);
+      for (let y = 0; y < height; y += 42) {
+        beginShape();
+        stroke(214, 22, 82, 0.055);
+        for (let x = -20; x <= width + 20; x += 24) {
+          let bend = 0;
+          for (const w of wells) bend += Math.sin((x - w.x) * 0.012 + w.target * 3) * w.charge * 5 / (1 + Math.abs(y - w.y) * 0.02);
+          vertex(x, y + bend + Math.sin(x * 0.01 + t * 2) * 4);
+        }
+        endShape();
+      }
+    }
+
+    function convergentError(a, target) {
+      let x = target, h1 = 1, h0 = 0, k1 = 0, k0 = 1;
+      let best = 9, depth = 0;
+      for (let i = 0; i < 8; i++) {
+        const n = Math.floor(x);
+        const h = n * h1 + h0;
+        const k = n * k1 + k0;
+        if (k !== 0) {
+          const e = Math.abs(a - h / k);
+          if (e < best) { best = e; depth = i + 1; }
+        }
+        const frac = x - n;
+        if (frac < 0.000001) break;
+        h0 = h1; h1 = h; k0 = k1; k1 = k; x = 1 / frac;
+      }
+      return { err: best, depth };
+    }
+
+    function resetStone(s) {
+      s.x = random(width); s.y = random(-80, -10);
+      s.vx = random(-0.35, 0.35); s.vy = random(0.5, 1.7);
+      s.q = Math.floor(random(17, 211));
+      s.p = Math.floor(s.q * random(0.62, 2.75)) + 1;
+      s.trail = [];
+    }
+
+    function mousePressed() {
+      seedValue = (seedValue * 1103515245 + 12345 + Math.floor(mouseX * 19 + mouseY * 23)) >>> 0;
+      reseed(seedValue);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      reseed(seedValue);
+    }
+  </script>
+</body>
+</html>
