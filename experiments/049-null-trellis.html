@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>null trellis</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #05060a; color: #dfe8e4; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    canvas { display: block; }
+    #caption {
+      position: fixed; left: 18px; bottom: 16px; max-width: min(820px, calc(100vw - 36px));
+      color: rgba(226, 238, 232, 0.78); font-size: 12px; line-height: 1.45; letter-spacing: 0.02em;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.9); user-select: none;
+    }
+    #caption b { color: rgba(188, 231, 255, 0.96); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>null trellis</b> · residues braid only when their weighted sum vanishes; every connection is a small proof of nothing.</div>
+  <script>
+    const primes = [29, 31, 37, 41, 43, 47, 53];
+    let nodes = [];
+    let ghosts = [];
+    let seedValue = 49031;
+    let modulus = 37;
+    let tick = 0;
+    let caption;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      colorMode(HSB, 360, 100, 100, 1);
+      caption = document.getElementById('caption');
+      reseed(seedValue);
+    }
+
+    function reseed(s) {
+      randomSeed(s);
+      noiseSeed(s);
+      tick = 0;
+      ghosts = [];
+      modulus = primes[Math.abs(s) % primes.length];
+      const count = constrain(Math.floor(width * height / 14500), 42, 118);
+      nodes = [];
+      for (let i = 0; i < count; i++) {
+        const ring = Math.sqrt((i + 0.5) / count);
+        const angle = i * 2.39996323 + random(-0.18, 0.18);
+        const cx = width * 0.5 + Math.cos(angle) * ring * width * 0.43;
+        const cy = height * 0.5 + Math.sin(angle) * ring * height * 0.38;
+        nodes.push({
+          x: cx, y: cy, ox: cx, oy: cy,
+          r: (i * 17 + Math.floor(random(modulus))) % modulus,
+          w: 1 + ((i * 11 + s) % (modulus - 1)),
+          phase: random(TAU), drift: random(0.35, 1.25), charge: 0
+        });
+      }
+      if (caption) caption.innerHTML = `<b>null trellis</b> · ${nodes.length} residues search mod ${modulus}; edges appear only where a weighted pair cancels to zero. click to change the field.`;
+    }
+
+    function draw() {
+      background(226, 42, 4, 0.18);
+      tick += 0.007;
+      moveNodes();
+      drawGhosts();
+      weaveNulls();
+      drawNodes();
+      if (frameCount % 180 === 0) mutateOne();
+    }
+
+    function moveNodes() {
+      for (const n of nodes) {
+        const curl = noise(n.ox * 0.003, n.oy * 0.003, tick * n.drift) * TAU * 2;
+        const pulse = 12 + 28 * noise(n.r * 0.09, tick + n.phase);
+        n.x = n.ox + Math.cos(curl + n.phase) * pulse;
+        n.y = n.oy + Math.sin(curl - n.phase) * pulse;
+        n.charge *= 0.94;
+      }
+    }
+
+    function weaveNulls() {
+      blendMode(ADD);
+      let made = 0;
+      const maxDist = Math.min(width, height) * 0.31;
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j];
+          const d = dist(a.x, a.y, b.x, b.y);
+          if (d > maxDist) continue;
+          const sum = mod(a.r * b.w + b.r * a.w + i - j, modulus);
+          const near = Math.min(sum, modulus - sum);
+          if (near <= 1) {
+            const alpha = (1 - d / maxDist) * (near === 0 ? 0.52 : 0.14);
+            stroke(188 + near * 44 + a.charge * 18, 58, 72 + 20 * (near === 0), alpha);
+            strokeWeight(near === 0 ? 1.15 : 0.42);
+            const sag = Math.sin(tick * 3 + a.phase - b.phase) * 22;
+            noFill();
+            bezier(a.x, a.y, (a.x + b.x) / 2 + sag, (a.y + b.y) / 2 - sag, (a.x + b.x) / 2 - sag, (a.y + b.y) / 2 + sag, b.x, b.y);
+            if (near === 0 && random() < 0.012) recordGhost(a, b);
+            a.charge += near === 0 ? 0.012 : 0.003;
+            b.charge += near === 0 ? 0.012 : 0.003;
+            made++;
+          }
+        }
+      }
+      blendMode(BLEND);
+      if (caption && frameCount % 24 === 0) caption.innerHTML = `<b>null trellis</b> · mod ${modulus}: ${made} temporary cancellations; bright arcs are exact zeros, dim arcs are almost-nothings. click to reseed.`;
+    }
+
+    function recordGhost(a, b) {
+      ghosts.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, r: 5, life: 1, hue: 184 + ((a.r + b.r) % 60) });
+      if (ghosts.length > 80) ghosts.shift();
+    }
+
+    function drawGhosts() {
+      noFill();
+      for (let i = ghosts.length - 1; i >= 0; i--) {
+        const g = ghosts[i];
+        stroke(g.hue, 70, 85, g.life * 0.38);
+        strokeWeight(1);
+        circle(g.x, g.y, g.r);
+        g.r += 1.8 + (1 - g.life) * 2.3;
+        g.life *= 0.965;
+        if (g.life < 0.035) ghosts.splice(i, 1);
+      }
+    }
+
+    function drawNodes() {
+      noStroke();
+      for (const n of nodes) {
+        const glow = constrain(n.charge, 0, 1.4);
+        fill(198 + glow * 42, 42, 28 + glow * 48, 0.18 + glow * 0.22);
+        circle(n.x, n.y, 10 + glow * 18);
+        fill(210 + n.r * 0.7, 35 + glow * 30, 68 + glow * 22, 0.72);
+        circle(n.x, n.y, 2.4 + glow * 2.8);
+      }
+    }
+
+    function mutateOne() {
+      if (!nodes.length) return;
+      const n = random(nodes);
+      n.r = mod(n.r + Math.floor(random(1, modulus)), modulus);
+      n.w = 1 + mod(n.w + Math.floor(random(1, 7)), modulus - 1);
+      n.charge = 1.2;
+    }
+
+    function mod(n, m) { return ((n % m) + m) % m; }
+
+    function mousePressed() {
+      seedValue = Math.floor(random(1000000));
+      reseed(seedValue);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      reseed(seedValue);
+    }
+  </script>
+</body>
+</html>
