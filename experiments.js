@@ -52,11 +52,16 @@ const experiments = [
 
 const list = document.getElementById('experiment-list');
 const archiveNote = document.getElementById('archive-note');
+const latestLink = document.getElementById('latest-link');
 
 if (archiveNote && experiments.length > 0) {
   const newest = experiments[0].date;
   const oldest = experiments[experiments.length - 1].date;
   archiveNote.textContent = `${experiments.length} small tests · ${oldest} → ${newest}`;
+}
+
+if (latestLink && experiments.length > 0) {
+  latestLink.href = `experiments/${experiments[0].id}.html`;
 }
 
 if (experiments.length === 0) {
