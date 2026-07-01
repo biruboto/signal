@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>euclid bloom — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #08090d;
+      color: #d7dccd;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(560px, calc(100vw - 36px));
+      color: rgba(230, 235, 214, 0.76);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.8);
+      user-select: none;
+    }
+    .title {
+      color: rgba(248, 244, 206, 0.92);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(169, 211, 191, 0.88); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">euclid bloom</div>
+    <div id="caption">waiting for the first quotient to open</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    const palettes = [
+      ['#f6d785', '#e7896d', '#91c7a9', '#7ba7d7', '#d7b4ef'],
+      ['#e8f0b5', '#9fd8cb', '#6f9ac7', '#c17fb5', '#f2a66e'],
+      ['#fbf0c2', '#d3a05e', '#83b799', '#537895', '#9c6d9b']
+    ];
+
+    let flowers = [];
+    let seedA, seedB, tick = 0, bloomCount = 0;
+    let captionEl, readoutEl;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      captionEl = document.getElementById('caption');
+      readoutEl = document.getElementById('readout');
+      resetGarden();
+    }
+
+    function resetGarden() {
+      randomSeed(floor(Date.now() / 86400000));
+      noiseSeed(floor(Date.now() / 9973));
+      seedA = floor(random(420, 1600));
+      seedB = floor(random(250, 1300));
+      if (seedA === seedB) seedA += 37;
+      flowers = [];
+      tick = 0;
+      bloomCount = 0;
+      background(7, 8, 13);
+      makeEuclidBloom(width * 0.5, height * 0.52, seedA, seedB, min(width, height) * 0.29, 0, -HALF_PI);
+      captionEl.textContent = 'the euclidean algorithm is asked to spend its quotients as petals before it reaches one.';
+    }
+
+    function euclidSteps(a, b) {
+      const steps = [];
+      let x = Math.max(a, b);
+      let y = Math.min(a, b);
+      while (y > 0 && steps.length < 34) {
+        const q = Math.floor(x / y);
+        const r = x % y;
+        steps.push({ x, y, q, r, ratio: y / x });
+        x = y;
+        y = r;
+      }
+      return steps;
+    }
+
+    function makeEuclidBloom(cx, cy, a, b, radius, depth, angle) {
+      const steps = euclidSteps(a, b);
+      const pal = random(palettes);
+      let orbit = 0;
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        const petals = constrain(s.q + 1, 2, 13);
+        const ring = radius * (1 - i / (steps.length + 2));
+        const petalR = ring * map(s.r || 1, 1, s.y || 2, 0.12, 0.42, true);
+        const shade = pal[i % pal.length];
+        for (let p = 0; p < petals; p++) {
+          const theta = angle + orbit + TWO_PI * p / petals + noise(i * 0.7, p) * 0.28;
+          const d = ring * (0.22 + 0.72 * s.ratio);
+          flowers.push({
+            x: cx + cos(theta) * d,
+            y: cy + sin(theta) * d,
+            theta,
+            rx: max(5, petalR * random(0.35, 0.75)),
+            ry: max(10, petalR * random(0.75, 1.65)),
+            hue: shade,
+            age: -i * 7 - p * 1.7,
+            life: random(460, 760),
+            q: s.q,
+            r: s.r,
+            depth,
+            pulse: random(TWO_PI)
+          });
+        }
+        orbit += (s.q % 2 === 0 ? 1 : -1) * (PI / (2.6 + s.q));
+      }
+
+      if (depth < 3 && steps.length > 4 && radius > 62) {
+        const last = steps[min(steps.length - 2, 8)];
+        const branchN = constrain((last.q % 5) + 2, 2, 6);
+        for (let k = 0; k < branchN; k++) {
+          const theta = angle + TWO_PI * k / branchN + random(-0.22, 0.22);
+          const nx = cx + cos(theta) * radius * random(0.47, 0.72);
+          const ny = cy + sin(theta) * radius * random(0.47, 0.72);
+          makeEuclidBloom(nx, ny, max(2, b - last.r + k * 11), max(1, last.y - k * 7), radius * random(0.34, 0.49), depth + 1, theta);
+        }
+      }
+    }
+
+    function drawPetal(f) {
+      const born = tick - f.age;
+      if (born < 0) return;
+      const t = constrain(born / 70, 0, 1);
+      const fade = constrain(1 - born / f.life, 0, 1);
+      const wobble = sin(frameCount * 0.012 + f.pulse) * 0.06;
+      const sc = easeOutCubic(t) * (0.72 + 0.32 * fade);
+      push();
+      translate(f.x, f.y);
+      rotate(f.theta + wobble);
+      noStroke();
+      const c = color(f.hue);
+      c.setAlpha(22 + 92 * fade);
+      fill(c);
+      ellipse(0, -f.ry * 0.2, f.rx * sc, f.ry * sc);
+      c.setAlpha(8 + 34 * fade);
+      fill(c);
+      ellipse(0, f.ry * 0.18, f.rx * 0.42 * sc, f.ry * 1.5 * sc);
+      stroke(247, 236, 183, 16 + 48 * fade);
+      strokeWeight(0.7);
+      line(0, 0, 0, -f.ry * 0.72 * sc);
+      pop();
+    }
+
+    function draw() {
+      tick++;
+      background(7, 8, 13, 18);
+
+      stroke(118, 150, 139, 18);
+      strokeWeight(1);
+      for (let i = 0; i < flowers.length; i += 3) {
+        const a = flowers[i];
+        const b = flowers[(i + 17) % flowers.length];
+        if (tick + a.age > 25 && (a.q + b.q + frameCount) % 11 === 0) {
+          line(a.x, a.y, b.x, b.y);
+        }
+      }
+
+      bloomCount = 0;
+      for (const f of flowers) {
+        drawPetal(f);
+        if (tick - f.age > 0) bloomCount++;
+      }
+
+      const s = euclidSteps(seedA, seedB);
+      const gcd = s.length ? s[s.length - 1].y : 1;
+      readoutEl.textContent = `${seedA}:${seedB} · ${s.length} divisions · ${bloomCount}/${flowers.length} quotients visible · terminal gcd ${gcd}`;
+
+      if (tick % 900 === 0) resetGarden();
+    }
+
+    function easeOutCubic(x) {
+      return 1 - Math.pow(1 - x, 3);
+    }
+
+    function mousePressed() {
+      resetGarden();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetGarden();
+    }
+  </script>
+</body>
+</html>
