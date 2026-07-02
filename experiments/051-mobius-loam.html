@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mobius loam — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #07080b;
+      color: #d9dfd0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(620px, calc(100vw - 36px));
+      color: rgba(226, 232, 214, 0.78);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 14px rgba(0,0,0,0.82);
+      user-select: none;
+    }
+    .title {
+      color: rgba(248, 241, 196, 0.94);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(170, 213, 190, 0.9); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">mobius loam</div>
+    <div id="caption">waiting for square factors to rot out of the field</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let cells = [];
+    let primes = [];
+    let cols = 0, rows = 0, step = 18, origin = 1;
+    let band = 0, dailySeed = 0;
+    let captionEl, readoutEl;
+    let counts = { pos: 0, neg: 0, zero: 0, sum: 0 };
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      captionEl = document.getElementById('caption');
+      readoutEl = document.getElementById('readout');
+      dailySeed = Math.floor(Date.now() / 86400000);
+      resetField();
+    }
+
+    function resetField() {
+      randomSeed(dailySeed + Math.floor(millis() / 60000));
+      noiseSeed(dailySeed * 17 + 51);
+      step = constrain(Math.floor(Math.min(width, height) / 34), 11, 24);
+      cols = Math.ceil(width / step) + 4;
+      rows = Math.ceil(height / step) + 4;
+      origin = Math.floor(random(120, 2300));
+      band = Math.floor(random(17, 61));
+      const maxN = origin + cols * rows + band * rows + 400;
+      primes = sieve(Math.ceil(Math.sqrt(maxN)) + 8);
+      cells = [];
+      counts = { pos: 0, neg: 0, zero: 0, sum: 0 };
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = origin + x + y * band;
+          const m = mobius(n);
+          const softness = squareDebt(n);
+          const drift = noise(x * 0.09, y * 0.09, dailySeed * 0.01);
+          cells.push({
+            x: (x - 2) * step,
+            y: (y - 2) * step,
+            n,
+            m,
+            softness,
+            phase: random(TWO_PI),
+            drift,
+            age: random(-80, 60)
+          });
+          if (m > 0) counts.pos++;
+          else if (m < 0) counts.neg++;
+          else counts.zero++;
+          counts.sum += m;
+        }
+      }
+      background(7, 8, 11);
+      captionEl.textContent = 'the möbius function classifies integers as fertile, inverted, or spoiled by a repeated prime; the soil keeps only squarefree memory.';
+    }
+
+    function sieve(limit) {
+      const mark = Array(limit + 1).fill(true);
+      const out = [];
+      mark[0] = mark[1] = false;
+      for (let i = 2; i <= limit; i++) {
+        if (!mark[i]) continue;
+        out.push(i);
+        for (let j = i * i; j <= limit; j += i) mark[j] = false;
+      }
+      return out;
+    }
+
+    function mobius(n) {
+      let x = n;
+      let factors = 0;
+      for (const p of primes) {
+        if (p * p > x) break;
+        if (x % p === 0) {
+          x = Math.floor(x / p);
+          factors++;
+          if (x % p === 0) return 0;
+          while (x % p === 0) x = Math.floor(x / p);
+        }
+      }
+      if (x > 1) factors++;
+      return factors % 2 === 0 ? 1 : -1;
+    }
+
+    function squareDebt(n) {
+      let debt = 0;
+      for (const p of primes) {
+        const q = p * p;
+        if (q > n) break;
+        if (n % q === 0) debt += 1 / p;
+      }
+      return constrain(debt, 0, 1);
+    }
+
+    function draw() {
+      background(7, 8, 11, 34);
+      translate((width - (cols - 4) * step) * 0.5, (height - (rows - 4) * step) * 0.5);
+
+      drawStrata();
+      noFill();
+      for (const c of cells) drawCell(c);
+
+      const active = cells.filter(c => c.age + frameCount * 0.9 > 0).length;
+      const muBias = nf(counts.sum / cells.length, 1, 3);
+      readoutEl.textContent = `origin ${origin} · stride ${band} · +${counts.pos} / −${counts.neg} / rot ${counts.zero} · mean μ ${muBias} · ${active} residues awake`;
+
+      if (frameCount % 1200 === 0) resetField();
+    }
+
+    function drawStrata() {
+      strokeWeight(1);
+      for (let y = -step; y < rows * step; y += step * 2) {
+        const yy = y + sin(frameCount * 0.006 + y * 0.02) * step * 0.18;
+        stroke(116, 91, 66, 16);
+        line(-step * 2, yy, cols * step, yy + sin(y * 0.011) * step);
+      }
+    }
+
+    function drawCell(c) {
+      const born = constrain((frameCount * 0.9 + c.age) / 90, 0, 1);
+      if (born <= 0) return;
+      const t = frameCount * 0.012 + c.phase;
+      const wob = (noise(c.x * 0.01, c.y * 0.01, frameCount * 0.006) - 0.5) * step * 0.72;
+      const x = c.x + cos(t) * wob * (0.2 + c.drift);
+      const y = c.y + sin(t * 0.7) * wob;
+      const r = step * (0.18 + 0.6 * born + 0.4 * c.softness);
+
+      if (c.m === 0) {
+        noStroke();
+        fill(78, 61, 49, 44 + 90 * c.softness);
+        ellipse(x, y + r * 0.28, r * 1.35, r * 0.72);
+        stroke(114, 84, 64, 24);
+        line(x - r * 0.45, y, x + r * 0.46, y + r * 0.1);
+        return;
+      }
+
+      const parity = c.m > 0 ? 1 : -1;
+      const pulse = 0.72 + 0.28 * sin(t * 2 + c.n * 0.03);
+      const a = 30 + 78 * born;
+      if (parity > 0) stroke(189, 224, 167, a);
+      else stroke(132, 178, 224, a);
+      strokeWeight(0.8 + 1.4 * pulse);
+
+      push();
+      translate(x, y);
+      rotate((parity * PI / 4) + sin(t) * 0.22);
+      const arms = parity > 0 ? 3 : 4;
+      for (let k = 0; k < arms; k++) {
+        rotate(TWO_PI / arms);
+        const len = r * (0.9 + 0.45 * noise(k, c.n * 0.01, frameCount * 0.01));
+        line(0, 0, len, 0);
+        point(len * 1.05, 0);
+      }
+      noStroke();
+      if (parity > 0) fill(235, 224, 151, 34 + 50 * pulse);
+      else fill(116, 198, 213, 28 + 48 * pulse);
+      ellipse(0, 0, r * 0.38, r * 0.38);
+      pop();
+    }
+
+    function mousePressed() {
+      dailySeed += 101;
+      resetField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetField();
+    }
+  </script>
+</body>
+</html>
