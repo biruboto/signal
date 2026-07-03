@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '052-collatz-estuary', title: 'collatz estuary', date: '2026-07-03' },
   { id: '051-mobius-loam', title: 'mobius loam', date: '2026-07-02' },
   { id: '050-euclid-bloom', title: 'euclid bloom', date: '2026-07-01' },
   { id: '049-null-trellis', title: 'null trellis', date: '2026-06-30' },

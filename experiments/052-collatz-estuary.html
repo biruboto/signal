@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>collatz estuary — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #05070a;
+      color: #dbe7e2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(680px, calc(100vw - 36px));
+      color: rgba(219, 231, 226, 0.76);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 16px rgba(0,0,0,0.86);
+      user-select: none;
+    }
+    .title {
+      color: rgba(190, 230, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(174, 222, 190, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">collatz estuary</div>
+    <div id="caption">integers arrive upstream, shed parity, and leave their stopping-time silt in shared water.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let walkers = [];
+    let deposits = [];
+    let cols = 0, rows = 0, cell = 16;
+    let seedBase = 0, daySeed = 0, spawnCursor = 0;
+    let captionEl, readoutEl;
+    let longest = { n: 1, steps: 0, peak: 1 };
+    const maxWalkers = 260;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      captionEl = document.getElementById('caption');
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetEstuary();
+    }
+
+    function resetEstuary() {
+      randomSeed(daySeed * 52 + 7);
+      noiseSeed(daySeed * 521);
+      cell = constrain(Math.floor(Math.min(width, height) / 42), 10, 22);
+      cols = Math.ceil(width / cell);
+      rows = Math.ceil(height / cell);
+      deposits = new Float32Array(cols * rows);
+      walkers = [];
+      spawnCursor = 0;
+      seedBase = Math.floor(random(700, 9000));
+      longest = { n: seedBase, steps: 0, peak: seedBase };
+      background(5, 7, 10);
+      captionEl.textContent = 'each seed follows n→n/2 or 3n+1; residue is mapped by log height and parity, so separate histories share the same mouth.';
+      for (let i = 0; i < maxWalkers; i++) spawnWalker();
+    }
+
+    function spawnWalker() {
+      const k = spawnCursor++;
+      const n = seedBase + k * 2 + Math.floor(17 * noise(k * 0.071, daySeed));
+      const lane = (k * 37 + n) % cols;
+      walkers.push({
+        start: n,
+        n,
+        peak: n,
+        steps: 0,
+        lane,
+        hueBias: random(0.75, 1.25),
+        done: false
+      });
+    }
+
+    function draw() {
+      background(5, 7, 10, 34);
+      for (let i = 0; i < 680; i++) advance(walkers[i % walkers.length]);
+      evaporate();
+      renderDeposits();
+      renderWalkers();
+      const active = walkers.filter(w => !w.done).length;
+      readoutEl.textContent = `source ${seedBase} · active ${active}/${walkers.length} · longest ${longest.n} took ${longest.steps} tides · peak ${longest.peak}`;
+    }
+
+    function advance(w) {
+      if (w.done) return;
+      const x = positionX(w);
+      const y = positionY(w);
+      addDeposit(x, y, w.n % 2 === 0 ? 0.88 : 1.42, w.steps);
+
+      if (w.n === 1 || w.steps > 520) {
+        w.done = true;
+        if (w.steps > longest.steps) longest = { n: w.start, steps: w.steps, peak: w.peak };
+        if (walkers.length < maxWalkers + 80) spawnWalker();
+        return;
+      }
+
+      if (w.n % 2 === 0) w.n = w.n / 2;
+      else w.n = 3 * w.n + 1;
+      w.peak = Math.max(w.peak, w.n);
+      w.steps++;
+      w.lane = (w.lane + (w.n % 2 === 0 ? -1 : 2) + cols) % cols;
+    }
+
+    function positionX(w) {
+      const bend = Math.sin(Math.log(w.n + 1) * 1.7 + w.start * 0.01) * 5;
+      return constrain(Math.floor(w.lane + bend), 0, cols - 1);
+    }
+
+    function positionY(w) {
+      const h = Math.log(w.n + 1) / Math.log(w.peak + 3);
+      const fall = w.steps / (w.steps + 42);
+      return constrain(Math.floor((0.08 + 0.84 * (1 - h) + 0.08 * fall) * rows), 0, rows - 1);
+    }
+
+    function addDeposit(x, y, amount, age) {
+      const r = 1 + (age % 5 === 0 ? 1 : 0);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= cols || yy >= rows) continue;
+          deposits[yy * cols + xx] += amount / (1 + Math.abs(dx) + Math.abs(dy));
+        }
+      }
+    }
+
+    function evaporate() {
+      for (let i = 0; i < deposits.length; i++) deposits[i] *= 0.992;
+    }
+
+    function renderDeposits() {
+      noStroke();
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const v = deposits[y * cols + x];
+          if (v < 0.035) continue;
+          const a = constrain(v * 18, 8, 185);
+          const cold = constrain(v * 10, 0, 120);
+          const warm = constrain(v * 7, 0, 95);
+          fill(24 + warm, 56 + cold, 72 + cold * 0.8, a);
+          rect(x * cell, y * cell, cell + 1, cell + 1);
+        }
+      }
+    }
+
+    function renderWalkers() {
+      strokeWeight(Math.max(1, cell * 0.12));
+      for (const w of walkers) {
+        if (w.done) continue;
+        const x = (positionX(w) + 0.5) * cell;
+        const y = (positionY(w) + 0.5) * cell;
+        const odd = w.n % 2;
+        stroke(odd ? 255 : 139, odd ? 178 : 226, odd ? 116 : 255, 92);
+        point(x, y);
+      }
+      noStroke();
+      fill(195, 230, 255, 36);
+      rect(0, rows * cell * 0.89, width, 2);
+    }
+
+    function mousePressed() {
+      seedBase = Math.max(3, Math.floor(map(mouseX, 0, width, 300, 17000)) + Math.floor(map(mouseY, height, 0, 0, 7000)));
+      walkers = [];
+      deposits.fill(0);
+      spawnCursor = 0;
+      longest = { n: seedBase, steps: 0, peak: seedBase };
+      for (let i = 0; i < maxWalkers; i++) spawnWalker();
+      captionEl.textContent = 'new watershed selected by pointer: the conjecture is unchanged, but the sediment remembers a different doubt.';
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetEstuary();
+    }
+  </script>
+</body>
+</html>
