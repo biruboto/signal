@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>farey frost — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #030507;
+      color: #d8e6e3;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(720px, calc(100vw - 36px));
+      color: rgba(216, 230, 227, 0.74);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.9);
+      user-select: none;
+    }
+    .title {
+      color: rgba(185, 231, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(178, 224, 196, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">farey frost</div>
+    <div id="caption">neighboring fractions are permitted to crystallize only when their cross-determinant is one.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let fractions = [];
+    let frost = [];
+    let level = 0;
+    let targetOrder = 72;
+    let cursor = 0;
+    let daySeed = 0;
+    let readoutEl, captionEl;
+    let shimmer = 0;
+    const maxFrost = 2600;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      captionEl = document.getElementById('caption');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetFrost();
+    }
+
+    function resetFrost() {
+      randomSeed(daySeed * 53 + 19);
+      noiseSeed(daySeed * 503);
+      level = 1;
+      cursor = 0;
+      shimmer = random(1000);
+      frost = [];
+      targetOrder = Math.floor(map(Math.min(width, height), 320, 1300, 34, 104, true));
+      fractions = [{ a: 0, b: 1, x: marginX(), y: baseY(), mass: 1 }, { a: 1, b: 1, x: width - marginX(), y: baseY(), mass: 1 }];
+      background(3, 5, 7);
+      captionEl.textContent = 'a farey sequence grows by mediants; denominator is cold mass, determinant is adjacency, curvature is inherited argument.';
+      for (let i = 0; i < 900; i++) stepFarey();
+    }
+
+    function draw() {
+      background(3, 5, 7, 28);
+      for (let i = 0; i < 24; i++) stepFarey();
+      relaxFrost();
+      drawField();
+      drawFractions();
+      const newest = frost[frost.length - 1] || { a: 0, b: 1, parentGap: 1 };
+      readoutEl.textContent = `order ${level}/${targetOrder} · leaves ${fractions.length} · frost ${frost.length} · last ${newest.a}/${newest.b} from gap ${nf(newest.parentGap, 1, 5)}`;
+    }
+
+    function stepFarey() {
+      if (level >= targetOrder && frost.length > 300) {
+        if (random() < 0.015) pruneAndReseed();
+        return;
+      }
+
+      if (cursor >= fractions.length - 1) {
+        cursor = 0;
+        level++;
+        if (level > targetOrder) return;
+      }
+
+      const left = fractions[cursor];
+      const right = fractions[cursor + 1];
+      const denom = left.b + right.b;
+      const determinant = right.a * left.b - left.a * right.b;
+
+      if (determinant === 1 && denom <= level + 1) {
+        const a = left.a + right.a;
+        const b = denom;
+        const t = a / b;
+        const parentGap = right.a / right.b - left.a / left.b;
+        const arch = sin(PI * t);
+        const jitter = (noise(a * 0.17, b * 0.11, shimmer) - 0.5) * 22;
+        const node = {
+          a, b,
+          x: lerp(marginX(), width - marginX(), t),
+          y: baseY() - arch * height * 0.62 + jitter,
+          vx: 0,
+          vy: 0,
+          mass: sqrt(b),
+          parentGap,
+          age: 0,
+          phase: random(TWO_PI)
+        };
+        fractions.splice(cursor + 1, 0, node);
+        frost.push(node);
+        if (frost.length > maxFrost) frost.shift();
+        cursor += 2;
+      } else {
+        cursor++;
+      }
+    }
+
+    function relaxFrost() {
+      const pull = 0.0028;
+      for (const f of frost) {
+        const idealX = lerp(marginX(), width - marginX(), f.a / f.b);
+        const idealY = baseY() - sin(PI * f.a / f.b) * height * 0.62;
+        const wind = noise(f.a * 0.31, frameCount * 0.006, f.b * 0.07) - 0.5;
+        f.vx += (idealX - f.x) * pull + wind * 0.006;
+        f.vy += (idealY - f.y) * pull - 0.003 / max(1, f.parentGap * 80);
+        f.vx *= 0.92;
+        f.vy *= 0.92;
+        f.x += f.vx;
+        f.y += f.vy;
+        f.age++;
+      }
+    }
+
+    function drawField() {
+      noFill();
+      strokeWeight(1);
+      for (let i = 0; i < 20; i++) {
+        const q = (i + 1) / 21;
+        const y = baseY() - sin(PI * q) * height * 0.62;
+        stroke(50, 82, 94, 10 + 18 * sin(q * PI));
+        bezier(marginX(), baseY(), width * 0.31, y - height * 0.06, width * 0.69, y - height * 0.06, width - marginX(), baseY());
+      }
+    }
+
+    function drawFractions() {
+      blendMode(ADD);
+      for (const f of frost) {
+        const t = f.a / f.b;
+        const cold = map(log(f.b + 1), 0, log(targetOrder + 2), 0, 1, true);
+        const alpha = map(f.age, 0, 140, 190, 50, true);
+        const r = 0.6 + 7.5 / sqrt(f.b);
+        const pulse = 1 + 0.35 * sin(frameCount * 0.018 + f.phase);
+        stroke(80 + 95 * cold, 160 + 70 * (1 - cold), 210 + 30 * cold, alpha * 0.38);
+        strokeWeight(0.55);
+        const rootY = baseY() - 5;
+        line(f.x, f.y, lerp(marginX(), width - marginX(), t), rootY);
+        noStroke();
+        fill(130 + 95 * cold, 220 - 45 * cold, 255, alpha);
+        circle(f.x, f.y, r * pulse);
+        fill(210, 255, 236, alpha * 0.32);
+        circle(f.x + cos(f.phase) * r, f.y + sin(f.phase) * r, r * 0.45);
+      }
+      blendMode(BLEND);
+
+      stroke(190, 230, 218, 42);
+      strokeWeight(1);
+      line(marginX(), baseY(), width - marginX(), baseY());
+      noStroke();
+      fill(210, 230, 224, 96);
+      circle(marginX(), baseY(), 5);
+      circle(width - marginX(), baseY(), 5);
+    }
+
+    function pruneAndReseed() {
+      fractions = [{ a: 0, b: 1, x: marginX(), y: baseY(), mass: 1 }, { a: 1, b: 1, x: width - marginX(), y: baseY(), mass: 1 }];
+      level = 1;
+      cursor = 0;
+      shimmer += 17;
+    }
+
+    function marginX() { return Math.max(42, width * 0.08); }
+    function baseY() { return height * 0.82; }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetFrost();
+    }
+
+    function mousePressed() {
+      targetOrder = constrain(targetOrder + (mouseButton === LEFT ? 12 : -12), 24, 132);
+      resetFrost();
+    }
+  </script>
+</body>
+</html>
