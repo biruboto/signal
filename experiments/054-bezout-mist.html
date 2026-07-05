@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bezout mist — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #020407;
+      color: #dce9e7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      color: rgba(220, 233, 231, 0.72);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.92);
+      user-select: none;
+    }
+    .title {
+      color: rgba(197, 226, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(183, 237, 201, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">bezout mist</div>
+    <div id="caption">each lattice point asks for a certificate: ax + by = gcd(a,b). the smallest witness drifts like weather.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let cells = [];
+    let cols = 0;
+    let rows = 0;
+    let step = 12;
+    let daySeed = 0;
+    let t = 0;
+    let readoutEl, captionEl;
+    let chosenMod = 89;
+    let active = { x: 1, y: 1, g: 1, u: 0, v: 0, debt: 0 };
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      captionEl = document.getElementById('caption');
+      daySeed = Math.floor(Date.now() / 86400000);
+      buildField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      buildField();
+    }
+
+    function buildField() {
+      randomSeed(daySeed * 5407 + 23);
+      noiseSeed(daySeed * 9181 + 54);
+      step = Math.max(8, Math.min(18, Math.floor(Math.min(width, height) / 54)));
+      cols = Math.ceil(width / step) + 2;
+      rows = Math.ceil(height / step) + 2;
+      chosenMod = random([55, 64, 72, 81, 89, 97, 105, 121]);
+      cells = [];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const a = ((x + 1) * 3 + (y + 2) * 5 + daySeed) % chosenMod + 1;
+          const b = ((x + 4) * 7 + (y + 1) * 2 + daySeed * 2) % chosenMod + 1;
+          const w = bezout(a, b);
+          const strain = Math.log(1 + Math.abs(w.u) + Math.abs(w.v));
+          cells.push({ x, y, a, b, g: w.g, u: w.u, v: w.v, strain, phase: random(TAU), salt: random(1) });
+        }
+      }
+      background(2, 4, 7);
+      captionEl.textContent = 'a field of gcd certificates: common factors condense; large bezout witnesses become mist before they become proof.';
+    }
+
+    function draw() {
+      t += 0.006;
+      noStroke();
+      fill(2, 4, 7, 31);
+      rect(0, 0, width, height);
+
+      const cx = width * (0.5 + 0.27 * sin(t * 0.73));
+      const cy = height * (0.5 + 0.22 * cos(t * 0.61));
+      let nearest = Infinity;
+
+      blendMode(ADD);
+      for (const c of cells) {
+        const px = c.x * step - step;
+        const py = c.y * step - step;
+        const dx = px - cx;
+        const dy = py - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const wave = sin(dist * 0.026 - t * 9 + c.phase);
+        const witnessWind = sin((c.u * 0.13 + c.v * 0.17) + t * 5);
+        const pulse = Math.max(0, wave * 0.5 + witnessWind * 0.25 + 0.35);
+        const composite = c.g > 1 ? 1 : 0;
+        const huePull = Math.min(1, c.strain / 7.2);
+        const r = 18 + 76 * huePull + 18 * composite;
+        const g = 38 + 130 * composite + 46 * pulse;
+        const b = 58 + 126 * (1 - huePull) + 42 * pulse;
+        const a = 8 + 58 * pulse + 38 * composite;
+        const sz = step * (0.18 + pulse * 0.64 + Math.min(c.g, 13) * 0.025);
+
+        fill(r, g, b, a);
+        circle(px + step * 0.5, py + step * 0.5, sz);
+
+        if (pulse > 0.82 && c.g === 1 && frameCount % 2 === 0) {
+          stroke(145, 215, 255, 22);
+          const vx = Math.max(-1, Math.min(1, c.u / (Math.abs(c.u) + Math.abs(c.v) + 1)));
+          const vy = Math.max(-1, Math.min(1, c.v / (Math.abs(c.u) + Math.abs(c.v) + 1)));
+          line(px + step * 0.5, py + step * 0.5, px + step * (0.5 + vx), py + step * (0.5 + vy));
+          noStroke();
+        }
+
+        if (dist < nearest) {
+          nearest = dist;
+          active = { x: c.a, y: c.b, g: c.g, u: c.u, v: c.v, debt: c.strain };
+        }
+      }
+      blendMode(BLEND);
+
+      drawContours(cx, cy);
+      if (frameCount % 12 === 0) {
+        readoutEl.textContent = `modulus ${chosenMod} · witness ${active.u}×${active.x} + ${active.v}×${active.y} = ${active.g} · coefficient weather ${active.debt.toFixed(2)}`;
+      }
+    }
+
+    function drawContours(cx, cy) {
+      noFill();
+      for (let k = 0; k < 6; k++) {
+        const radius = (k + 1) * Math.min(width, height) * 0.095 + (sin(t * 3 + k) * 10);
+        stroke(118, 171, 202, 16 - k);
+        circle(cx, cy, radius * 2);
+      }
+      stroke(220, 245, 223, 34);
+      const a = active.u * 0.007 + t;
+      line(cx, cy, cx + cos(a) * 44, cy + sin(a) * 44);
+    }
+
+    function bezout(a, b) {
+      let oldR = a, r = b;
+      let oldS = 1, s = 0;
+      let oldT = 0, tt = 1;
+      while (r !== 0) {
+        const q = Math.floor(oldR / r);
+        [oldR, r] = [r, oldR - q * r];
+        [oldS, s] = [s, oldS - q * s];
+        [oldT, tt] = [tt, oldT - q * tt];
+      }
+      return { g: Math.abs(oldR), u: oldS, v: oldT };
+    }
+  </script>
+</body>
+</html>
