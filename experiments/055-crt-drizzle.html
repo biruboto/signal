@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>crt drizzle — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #020409;
+      color: #dce7e4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      color: rgba(220, 231, 228, 0.74);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.92);
+      user-select: none;
+    }
+    .title {
+      color: rgba(190, 226, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(180, 236, 196, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">crt drizzle</div>
+    <div id="caption">two modular rains cross the same roof. only compatible remainders are allowed to leave a drop.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let drops = [];
+    let strata = [];
+    let daySeed = 0;
+    let readoutEl, captionEl;
+    let t = 0;
+    let modulusA = 13;
+    let modulusB = 21;
+    let residueA = 0;
+    let residueB = 0;
+    let common = 1;
+    let combined = null;
+    let period = 273;
+    let scan = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      captionEl = document.getElementById('caption');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetWeather();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetWeather();
+    }
+
+    function resetWeather() {
+      randomSeed(daySeed * 7919 + 55);
+      noiseSeed(daySeed * 2027 + 11);
+      const pairs = [[12, 35], [14, 25], [15, 28], [16, 27], [18, 30], [21, 34], [22, 33], [24, 35]];
+      const pair = random(pairs);
+      modulusA = pair[0];
+      modulusB = pair[1];
+      common = gcd(modulusA, modulusB);
+      residueA = Math.floor(random(modulusA));
+      if (random() < 0.68) {
+        const k = Math.floor(random(Math.ceil(modulusB / common)));
+        residueB = (residueA + k * common) % modulusB;
+      } else {
+        residueB = (residueA + Math.floor(random(1, common)) + common) % modulusB;
+      }
+      combined = crt(residueA, modulusA, residueB, modulusB);
+      period = lcm(modulusA, modulusB);
+      scan = 0;
+      drops = [];
+      strata = [];
+      for (let i = 0; i < 9; i++) {
+        strata.push({
+          y: (i + 0.5) / 9,
+          drift: random(-0.6, 0.6),
+          phase: random(TAU),
+          weight: random(0.4, 1.1)
+        });
+      }
+      background(2, 4, 9);
+      captionEl.textContent = combined
+        ? 'chinese remainder weather: congruences with matching gcd residue condense into one longer clock.'
+        : 'incompatible congruences pass through one another; the roof records near-misses as dry light.';
+    }
+
+    function draw() {
+      t += 0.008;
+      noStroke();
+      fill(2, 4, 9, 30);
+      rect(0, 0, width, height);
+
+      drawRoof();
+      advanceSieve();
+      drawDrops();
+      drawScanLine();
+      updateReadout();
+    }
+
+    function drawRoof() {
+      blendMode(BLEND);
+      strokeWeight(1);
+      for (const s of strata) {
+        const y = s.y * height + sin(t * 2 + s.phase) * 8;
+        const alpha = 20 + s.weight * 28;
+        stroke(80, 122, 145, alpha);
+        noFill();
+        beginShape();
+        for (let x = -20; x <= width + 20; x += 18) {
+          const n = noise(x * 0.0025, s.y * 4, t * 0.2);
+          vertex(x, y + (n - 0.5) * 34 + sin(x * 0.015 + s.phase + t) * 6);
+        }
+        endShape();
+      }
+    }
+
+    function advanceSieve() {
+      const steps = Math.max(3, Math.floor(width / 210));
+      for (let i = 0; i < steps; i++) {
+        scan = (scan + 1) % period;
+        const hitA = scan % modulusA === residueA;
+        const hitB = scan % modulusB === residueB;
+        const near = Math.min(modDistance(scan % modulusA, residueA, modulusA), modDistance(scan % modulusB, residueB, modulusB));
+        if (hitA || hitB || near <= 1) {
+          const x = (scan / period) * width;
+          const baseY = height * (0.15 + 0.7 * noise(scan * 0.037, daySeed * 0.01));
+          const both = hitA && hitB;
+          drops.push({
+            x,
+            y: -12,
+            targetY: baseY,
+            born: t,
+            age: 0,
+            both,
+            hitA,
+            hitB,
+            near,
+            salt: random(1),
+            sway: random(-1, 1),
+            size: both ? random(4.5, 9) : random(1.5, 4.5)
+          });
+        }
+      }
+      while (drops.length > 760) drops.shift();
+    }
+
+    function drawDrops() {
+      blendMode(ADD);
+      noStroke();
+      for (const d of drops) {
+        d.age += 0.012;
+        const fall = easeOutCubic(Math.min(1, d.age));
+        const x = d.x + sin(t * 3 + d.salt * TAU) * 13 * d.sway * (0.2 + fall);
+        const y = lerp(-20, d.targetY, fall);
+        const after = Math.max(0, d.age - 1);
+        const bloom = Math.exp(-after * 1.9);
+        if (d.both) {
+          fill(126, 232, 205, 118 * bloom);
+          ellipse(x, y, d.size * 3.8 * bloom, d.size * 3.8 * bloom);
+          fill(210, 246, 255, 185 * bloom);
+          ellipse(x, y, d.size * 1.2, d.size * 1.2);
+          stroke(92, 190, 214, 60 * bloom);
+          strokeWeight(1);
+          line(x, y, x, height);
+          noStroke();
+        } else {
+          const a = d.hitA ? 84 : 146;
+          const b = d.hitB ? 172 : 92;
+          fill(a, b, 230, (38 + (2 - Math.min(2, d.near)) * 28) * bloom);
+          ellipse(x, y, d.size * 2.5, d.size * 2.5);
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawScanLine() {
+      const x = (scan / period) * width;
+      blendMode(ADD);
+      stroke(160, 210, 255, 34);
+      strokeWeight(1);
+      line(x, 0, x, height);
+      if (combined) {
+        const cx = (combined.x / period) * width;
+        stroke(180, 255, 210, 70 + 50 * sin(t * 7));
+        line(cx, 0, cx, height);
+      }
+      blendMode(BLEND);
+    }
+
+    function updateReadout() {
+      const compatible = combined !== null;
+      const message = compatible
+        ? `x ≡ ${residueA} mod ${modulusA}; x ≡ ${residueB} mod ${modulusB}; witness x=${combined.x} mod ${period}`
+        : `x ≡ ${residueA} mod ${modulusA}; x ≡ ${residueB} mod ${modulusB}; gcd=${common} rejects the rain`;
+      readoutEl.textContent = `${message} · scan ${scan}/${period}`;
+    }
+
+    function crt(a, m, b, n) {
+      const g = gcd(m, n);
+      if (((b - a) % g + g) % g !== 0) return null;
+      const m1 = m / g;
+      const n1 = n / g;
+      const inv = modInverse(m1, n1);
+      if (inv === null) return null;
+      const k = ((((b - a) / g) % n1 + n1) % n1 * inv) % n1;
+      const x = ((a + m * k) % (m * n1) + (m * n1)) % (m * n1);
+      return { x };
+    }
+
+    function egcd(a, b) {
+      if (b === 0) return { g: a, x: 1, y: 0 };
+      const r = egcd(b, a % b);
+      return { g: r.g, x: r.y, y: r.x - Math.floor(a / b) * r.y };
+    }
+
+    function modInverse(a, m) {
+      const r = egcd(a, m);
+      if (Math.abs(r.g) !== 1) return null;
+      return ((r.x % m) + m) % m;
+    }
+
+    function gcd(a, b) {
+      a = Math.abs(a); b = Math.abs(b);
+      while (b) [a, b] = [b, a % b];
+      return a;
+    }
+
+    function lcm(a, b) { return Math.abs(a * b) / gcd(a, b); }
+
+    function modDistance(a, b, m) {
+      const d = Math.abs(a - b) % m;
+      return Math.min(d, m - d);
+    }
+
+    function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+    function mousePressed() { resetWeather(); }
+  </script>
+</body>
+</html>

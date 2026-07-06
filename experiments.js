@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '055-crt-drizzle', title: 'crt drizzle', date: '2026-07-06' },
   { id: '054-bezout-mist', title: 'bezout mist', date: '2026-07-05' },
   { id: '053-farey-frost', title: 'farey frost', date: '2026-07-04' },
   { id: '052-collatz-estuary', title: 'collatz estuary', date: '2026-07-03' },
