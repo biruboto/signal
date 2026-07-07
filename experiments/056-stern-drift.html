@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>stern drift — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #03030a;
+      color: #e4eee9;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      color: rgba(228, 238, 233, 0.74);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.92);
+      user-select: none;
+    }
+    .title {
+      color: rgba(214, 228, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(176, 239, 209, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">stern drift</div>
+    <div id="caption">a wandering number keeps asking the stern-brocot tree for its nearest fraction. each wrong turn leaves a pale oath.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let walkers = [];
+    let marks = [];
+    let daySeed = 0;
+    let readoutEl;
+    let horizon = 0;
+    let pulse = 0;
+    const maxMarks = 900;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetField();
+    }
+
+    function resetField() {
+      randomSeed(daySeed * 6151 + 56);
+      noiseSeed(daySeed * 1009 + 311);
+      walkers = [];
+      marks = [];
+      horizon = Math.floor(random(36, 84));
+      const count = Math.max(7, Math.floor(width / 135));
+      for (let i = 0; i < count; i++) {
+        walkers.push(makeWalker(i, count));
+      }
+      background(3, 3, 10);
+    }
+
+    function makeWalker(i, count) {
+      const base = (i + 0.5) / count;
+      return {
+        x: base,
+        target: random(0.08, 0.92),
+        drift: random(-0.0009, 0.0009),
+        phase: random(TAU),
+        salt: random(1000),
+        last: null,
+        hue: random(0.35, 1)
+      };
+    }
+
+    function draw() {
+      pulse += 0.006;
+      noStroke();
+      fill(3, 3, 10, 28);
+      rect(0, 0, width, height);
+
+      drawTreeVeil();
+      for (const w of walkers) stepWalker(w);
+      drawMarks();
+      drawWalkers();
+      updateReadout();
+    }
+
+    function stepWalker(w) {
+      const weather = noise(w.salt, pulse * 0.35) - 0.5;
+      w.target = constrain(w.target + w.drift + weather * 0.0035, 0.035, 0.965);
+      const depth = 5 + Math.floor(noise(w.salt + 9, pulse * 0.7) * 10);
+      const path = sternPath(w.target, depth);
+      const node = path[path.length - 1];
+      const value = node.n / node.d;
+      const err = Math.abs(w.target - value);
+      const changed = !w.last || w.last.n !== node.n || w.last.d !== node.d;
+      if (changed || random() < 0.08) {
+        const px = value * width;
+        const py = map(node.d, 1, horizon, height * 0.18, height * 0.86, true);
+        marks.push({
+          x: px,
+          y: py + random(-5, 5),
+          n: node.n,
+          d: node.d,
+          err,
+          age: 0,
+          side: node.side,
+          strength: changed ? 1 : 0.45,
+          hue: w.hue
+        });
+        if (marks.length > maxMarks) marks.splice(0, marks.length - maxMarks);
+      }
+      w.last = node;
+      w.x = lerp(w.x, value, 0.055);
+    }
+
+    function sternPath(x, depth) {
+      let ln = 0, ld = 1, rn = 1, rd = 1;
+      const path = [];
+      for (let i = 0; i < depth; i++) {
+        const mn = ln + rn;
+        const md = ld + rd;
+        const m = mn / md;
+        const side = x < m ? -1 : 1;
+        path.push({ n: mn, d: md, side });
+        if (side < 0) {
+          rn = mn; rd = md;
+        } else {
+          ln = mn; ld = md;
+        }
+      }
+      return path;
+    }
+
+    function drawTreeVeil() {
+      strokeWeight(1);
+      for (let d = 2; d <= horizon; d++) {
+        const y = map(d, 1, horizon, height * 0.16, height * 0.88);
+        const alpha = 10 + 18 * Math.exp(-d / 22);
+        stroke(94, 115, 140, alpha);
+        line(0, y, width, y);
+        for (let n = 1; n < d; n++) {
+          if (gcd(n, d) !== 1) continue;
+          const x = (n / d) * width;
+          const lift = 3 + 10 / Math.sqrt(d);
+          stroke(137, 162, 190, 18 + 44 / Math.sqrt(d));
+          line(x, y - lift, x, y + lift);
+        }
+      }
+    }
+
+    function drawMarks() {
+      blendMode(ADD);
+      for (const m of marks) {
+        m.age += 1;
+        const life = Math.max(0, 1 - m.age / 720);
+        const errGlow = constrain(1 - m.err * m.d * 40, 0.1, 1);
+        const r = 1.5 + 10 * errGlow * m.strength;
+        const warm = m.side > 0;
+        noStroke();
+        fill(warm ? 205 : 120, warm ? 154 : 186, warm ? 105 : 235, 42 * life * m.strength);
+        circle(m.x, m.y, r * 2.8);
+        fill(205, 236, 218, 130 * life * errGlow);
+        circle(m.x, m.y, r);
+        if (m.age < 120 && m.d < 34) {
+          stroke(190, 230, 210, 70 * life);
+          strokeWeight(0.75);
+          line(m.x, m.y, m.x + m.side * (8 + m.d * 0.3), m.y - 9);
+        }
+      }
+      blendMode(BLEND);
+      marks = marks.filter(m => m.age < 760);
+    }
+
+    function drawWalkers() {
+      for (const w of walkers) {
+        if (!w.last) continue;
+        const x = w.x * width;
+        const y = map(w.last.d, 1, horizon, height * 0.16, height * 0.88, true);
+        stroke(232, 246, 231, 150);
+        strokeWeight(1);
+        line(x, height * 0.11, x, y);
+        noStroke();
+        fill(232, 246, 231, 190);
+        circle(x, y, 5.5);
+        fill(130, 190, 255, 55);
+        circle(w.target * width, height * 0.11, 11);
+      }
+    }
+
+    function updateReadout() {
+      const latest = marks[marks.length - 1];
+      if (!latest) {
+        readoutEl.textContent = 'waiting for first rational oath';
+        return;
+      }
+      const debt = marks.reduce((sum, m) => sum + m.err * m.d, 0) / Math.max(1, marks.length);
+      readoutEl.textContent = `last witness ${latest.n}/${latest.d} · denominator horizon ${horizon} · mean approximation debt ${debt.toFixed(5)} · ${marks.length} oaths still fading`;
+    }
+
+    function gcd(a, b) {
+      a = Math.abs(a); b = Math.abs(b);
+      while (b) { const t = b; b = a % b; a = t; }
+      return a || 1;
+    }
+  </script>
+</body>
+</html>
