@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>adic snow — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #03040a;
+      color: #e9f2ee;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(780px, calc(100vw - 36px));
+      color: rgba(233, 242, 238, 0.74);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.94);
+      user-select: none;
+    }
+    .title {
+      color: rgba(219, 231, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(169, 232, 211, 0.92); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">adic snow</div>
+    <div id="caption">integers fall through several prime atmospheres. a flake brightens only where its hidden divisibility is deep.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    const primes = [2, 3, 5, 7, 11];
+    const palette = [
+      [132, 190, 255],
+      [137, 232, 203],
+      [242, 207, 124],
+      [225, 139, 220],
+      [190, 230, 138]
+    ];
+    let flakes = [];
+    let strata = [];
+    let daySeed = 0;
+    let t = 0;
+    let nextN = 1;
+    let readoutEl;
+    let gridStep = 26;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetField();
+    }
+
+    function resetField() {
+      randomSeed(daySeed * 7919 + 57);
+      noiseSeed(daySeed * 3571 + 941);
+      flakes = [];
+      strata = [];
+      t = random(1000);
+      nextN = Math.floor(random(40, 400));
+      gridStep = constrain(Math.floor(width / 52), 16, 34);
+      for (let i = 0; i < primes.length; i++) {
+        strata.push({
+          p: primes[i],
+          y: map(i, 0, primes.length - 1, height * 0.2, height * 0.78),
+          drift: random(TAU),
+          charge: 0,
+          last: 0
+        });
+      }
+      const count = Math.floor((width * height) / 14500);
+      for (let i = 0; i < count; i++) flakes.push(makeFlake(true));
+      background(3, 4, 10);
+    }
+
+    function makeFlake(scatter) {
+      const n = nextN++;
+      const valuations = primes.map(p => v(n, p));
+      const total = valuations.reduce((a, b) => a + b, 0);
+      const strongest = valuations.indexOf(Math.max(...valuations));
+      return {
+        n,
+        x: scatter ? random(width) : random(-40, width + 40),
+        y: scatter ? random(-height, height) : -random(10, 90),
+        vx: random(-0.22, 0.22),
+        vy: random(0.35, 1.1) + total * 0.035,
+        spin: random(TAU),
+        valuations,
+        total,
+        strongest,
+        age: random(200),
+        melt: 0
+      };
+    }
+
+    function draw() {
+      t += 0.006;
+      noStroke();
+      fill(3, 4, 10, 28);
+      rect(0, 0, width, height);
+      drawResidueLattice();
+      drawStrata();
+      stepFlakes();
+      updateReadout();
+    }
+
+    function drawResidueLattice() {
+      strokeWeight(1);
+      for (let x = ((frameCount * 0.12) % gridStep); x < width; x += gridStep) {
+        const q = (Math.floor(x / gridStep) + daySeed) % 11;
+        stroke(88, 116, 145, q === 0 ? 38 : 12);
+        line(x, 0, x + sin(t + x * 0.003) * 18, height);
+      }
+      for (let y = 0; y < height; y += gridStep) {
+        const a = 10 + 12 * noise(0.01 * y, t);
+        stroke(71, 93, 120, a);
+        line(0, y + sin(t + y * 0.01) * 3, width, y + cos(t + y * 0.006) * 3);
+      }
+    }
+
+    function drawStrata() {
+      blendMode(ADD);
+      for (let i = 0; i < strata.length; i++) {
+        const s = strata[i];
+        s.charge *= 0.965;
+        const c = palette[i];
+        const wav = sin(t * (0.7 + i * 0.11) + s.drift) * 18;
+        stroke(c[0], c[1], c[2], 18 + s.charge * 4);
+        strokeWeight(1 + min(5, s.charge * 0.18));
+        noFill();
+        beginShape();
+        for (let x = -20; x <= width + 20; x += 18) {
+          const y = s.y + wav * sin(x * 0.01 + t + i) + (noise(i * 9, x * 0.006, t) - 0.5) * 18;
+          vertex(x, y);
+        }
+        endShape();
+        noStroke();
+        fill(c[0], c[1], c[2], 22 + s.charge * 3);
+        textSize(10);
+        text('p=' + s.p, 18 + i * 54, s.y - 10);
+      }
+      blendMode(BLEND);
+    }
+
+    function stepFlakes() {
+      blendMode(ADD);
+      for (let i = flakes.length - 1; i >= 0; i--) {
+        const f = flakes[i];
+        f.age++;
+        const wind = (noise(f.n * 0.017, f.y * 0.006, t) - 0.5) * 0.95;
+        f.x += f.vx + wind + sin(t + f.spin) * 0.08;
+        f.y += f.vy;
+        f.spin += 0.02 + f.total * 0.002;
+
+        for (let k = 0; k < strata.length; k++) {
+          const s = strata[k];
+          const band = s.y + sin(t + f.x * 0.01 + k) * 13;
+          if (abs(f.y - band) < 2.8 + f.valuations[k] * 3 && f.valuations[k] > 0) {
+            s.charge += f.valuations[k] * 0.42;
+            s.last = f.n;
+            f.melt += 0.03 * f.valuations[k];
+            drawHalo(f.x, f.y, k, f.valuations[k], f.n);
+          }
+        }
+
+        drawFlake(f);
+        if (f.y > height + 70 || f.x < -90 || f.x > width + 90 || f.melt > 1.4) {
+          flakes.splice(i, 1);
+          flakes.push(makeFlake(false));
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawFlake(f) {
+      const c = palette[f.strongest];
+      const depth = max(1, f.total);
+      const a = 32 + depth * 24;
+      const r = 1.8 + sqrt(depth) * 2.3;
+      stroke(c[0], c[1], c[2], a);
+      strokeWeight(0.7 + min(2.5, depth * 0.22));
+      const arms = 3 + (f.n % 5);
+      push();
+      translate(f.x, f.y);
+      rotate(f.spin);
+      for (let j = 0; j < arms; j++) {
+        const ang = (TAU * j) / arms;
+        const len = r * (1.4 + (f.valuations[j % primes.length] || 0) * 0.72);
+        line(cos(ang) * 1.5, sin(ang) * 1.5, cos(ang) * len, sin(ang) * len);
+      }
+      noStroke();
+      fill(235, 248, 255, min(180, a + 40));
+      circle(0, 0, 1.5 + depth * 0.18);
+      pop();
+    }
+
+    function drawHalo(x, y, k, power, n) {
+      const c = palette[k];
+      noFill();
+      stroke(c[0], c[1], c[2], 18 + power * 23);
+      strokeWeight(0.8);
+      const rr = 8 + power * 7 + (n % 13);
+      circle(x, y, rr);
+      if (power > 1) circle(x, y, rr * 1.8);
+    }
+
+    function v(n, p) {
+      let c = 0;
+      while (n > 0 && n % p === 0) {
+        c++;
+        n = Math.floor(n / p);
+      }
+      return c;
+    }
+
+    function updateReadout() {
+      if (!readoutEl || frameCount % 12 !== 0) return;
+      const awake = strata
+        .map(s => 'p=' + s.p + ' charge ' + nf(s.charge, 1, 1) + (s.last ? ' last ' + s.last : ''))
+        .join(' · ');
+      readoutEl.textContent = 'valuation weather · next integer ' + nextN + ' · ' + awake;
+    }
+  </script>
+</body>
+</html>
