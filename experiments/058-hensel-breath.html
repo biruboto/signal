@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hensel breath — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #05030a;
+      color: #edf5ee;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(780px, calc(100vw - 36px));
+      color: rgba(237, 245, 238, 0.74);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.95);
+      user-select: none;
+    }
+    .title {
+      color: rgba(228, 238, 255, 0.97);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(177, 235, 213, 0.95); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">hensel breath</div>
+    <div id="caption">a root is guessed in a small modulus, then lifted through thicker rings. every successful digit exhales a larger circle of certainty.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    const P = 5;
+    const LAYERS = 8;
+    const palette = [
+      [110, 177, 255],
+      [137, 231, 203],
+      [244, 205, 119],
+      [223, 137, 223],
+      [174, 235, 133]
+    ];
+
+    let cells = [];
+    let wells = [];
+    let powers = [];
+    let daySeed = 0;
+    let t = 0;
+    let readoutEl;
+    let activeWell = 0;
+    let lastLift = null;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetField();
+    }
+
+    function resetField() {
+      randomSeed(daySeed * 9311 + 58);
+      noiseSeed(daySeed * 4159 + 271);
+      powers = [1];
+      for (let i = 1; i <= LAYERS + 1; i++) powers[i] = powers[i - 1] * P;
+      wells = [];
+      const count = constrain(Math.floor(width / 170), 4, 9);
+      for (let i = 0; i < count; i++) wells.push(makeWell(i, count));
+      cells = [];
+      const cellCount = Math.floor((width * height) / 9000);
+      for (let i = 0; i < cellCount; i++) cells.push(makeCell(true));
+      activeWell = 0;
+      lastLift = null;
+      t = random(1000);
+      background(5, 3, 10);
+    }
+
+    function makeWell(i, count) {
+      const base = (i * 2 + Math.floor(random(P))) % P;
+      const target = (base * base + P * Math.floor(random(1, 12))) % powers[LAYERS];
+      return {
+        x: map(i + 0.5, 0, count, width * 0.06, width * 0.94),
+        y: random(height * 0.27, height * 0.74),
+        root: base,
+        target,
+        layer: 1,
+        age: random(TAU),
+        charge: 0,
+        hue: i % palette.length,
+        trace: []
+      };
+    }
+
+    function makeCell(scatter) {
+      const w = random(wells);
+      return {
+        x: scatter ? random(width) : random([-25, width + 25]),
+        y: scatter ? random(height) : random(height),
+        vx: random(-0.25, 0.25),
+        vy: random(-0.18, 0.18),
+        well: wells.indexOf(w),
+        residue: Math.floor(random(powers[LAYERS])),
+        salt: random(1000),
+        witness: false
+      };
+    }
+
+    function draw() {
+      t += 0.01;
+      noStroke();
+      fill(5, 3, 10, 30);
+      rect(0, 0, width, height);
+      drawBreathingRings();
+      maybeLift();
+      driftCells();
+      drawWells();
+      updateReadout();
+    }
+
+    function maybeLift() {
+      if (frameCount % 38 !== 0 || wells.length === 0) return;
+      const w = wells[activeWell % wells.length];
+      const currentMod = powers[w.layer];
+      const nextMod = powers[w.layer + 1];
+      let found = w.root;
+      for (let k = 0; k < P; k++) {
+        const candidate = w.root + k * currentMod;
+        if (((candidate * candidate - w.target) % nextMod + nextMod) % nextMod === 0) {
+          found = candidate;
+          break;
+        }
+      }
+      const digit = Math.floor((found - w.root) / currentMod);
+      w.root = found;
+      w.layer++;
+      w.charge += 5 + digit;
+      w.trace.unshift({ digit, layer: w.layer, pulse: 1 });
+      w.trace = w.trace.slice(0, 12);
+      lastLift = { index: activeWell % wells.length, digit, layer: w.layer, root: w.root, target: w.target };
+      if (w.layer >= LAYERS) {
+        w.layer = 1;
+        w.root = ((w.root % P) + P) % P;
+        w.target = (w.root * w.root + P * Math.floor(random(1, powers[LAYERS - 1] / P))) % powers[LAYERS];
+      }
+      activeWell++;
+    }
+
+    function drawBreathingRings() {
+      blendMode(ADD);
+      noFill();
+      for (let i = 0; i < wells.length; i++) {
+        const w = wells[i];
+        const c = palette[w.hue];
+        w.charge *= 0.955;
+        const maxR = min(width, height) * 0.36;
+        for (let layer = 1; layer <= w.layer; layer++) {
+          const r = (layer / LAYERS) * maxR + sin(t * 1.7 + w.age + layer) * 4;
+          const a = 4 + layer * 3 + w.charge * (layer === w.layer ? 2.8 : 0.35);
+          stroke(c[0], c[1], c[2], a);
+          strokeWeight(layer === w.layer ? 1.4 : 0.7);
+          ellipse(w.x, w.y, r * 2.0, r * (1.18 + 0.08 * sin(t + i)));
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function driftCells() {
+      blendMode(ADD);
+      for (const c of cells) {
+        const w = wells[c.well];
+        const dx = w.x - c.x;
+        const dy = w.y - c.y;
+        const d = sqrt(dx * dx + dy * dy) + 0.001;
+        const layerMod = powers[max(1, w.layer)];
+        const congruent = ((c.residue * c.residue - w.target) % layerMod + layerMod) % layerMod === 0;
+        const pull = congruent ? 0.026 : -0.004;
+        c.vx += (dx / d) * pull + (noise(c.salt, t) - 0.5) * 0.035;
+        c.vy += (dy / d) * pull + (noise(t, c.salt) - 0.5) * 0.035;
+        c.vx *= 0.986;
+        c.vy *= 0.986;
+        c.x += c.vx;
+        c.y += c.vy;
+        if (c.x < -40 || c.x > width + 40 || c.y < -40 || c.y > height + 40) Object.assign(c, makeCell(false));
+
+        const depth = valuation(abs(c.residue - w.root), P);
+        const col = palette[(w.hue + depth) % palette.length];
+        const a = congruent ? 44 + depth * 13 : 9 + depth * 4;
+        stroke(col[0], col[1], col[2], a);
+        strokeWeight(congruent ? 1.2 + depth * 0.14 : 0.6);
+        point(c.x, c.y);
+        if (congruent && d < 80 + w.layer * 14) {
+          line(c.x, c.y, w.x + sin(c.salt) * 4, w.y + cos(c.salt) * 4);
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawWells() {
+      blendMode(ADD);
+      textAlign(CENTER, CENTER);
+      for (let i = 0; i < wells.length; i++) {
+        const w = wells[i];
+        const col = palette[w.hue];
+        noStroke();
+        fill(col[0], col[1], col[2], 75 + w.charge * 6);
+        circle(w.x, w.y, 4 + w.layer * 1.7);
+        fill(240, 248, 255, 44);
+        textSize(10);
+        text('5^' + w.layer, w.x, w.y - 18 - w.layer);
+        let yy = w.y + 20;
+        for (const tr of w.trace) {
+          tr.pulse *= 0.93;
+          fill(col[0], col[1], col[2], 35 + tr.pulse * 120);
+          text('+' + tr.digit, w.x, yy);
+          yy += 12;
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function valuation(n, p) {
+      if (n === 0) return LAYERS;
+      let v = 0;
+      while (n % p === 0 && v < LAYERS) {
+        n = Math.floor(n / p);
+        v++;
+      }
+      return v;
+    }
+
+    function updateReadout() {
+      if (!readoutEl) return;
+      if (!lastLift) {
+        readoutEl.textContent = 'waiting for the first lifted digit · modulus 5';
+        return;
+      }
+      readoutEl.textContent = `well ${lastLift.index + 1} accepted digit ${lastLift.digit} · lifted to 5^${lastLift.layer} · root ${lastLift.root}`;
+    }
+  </script>
+</body>
+</html>
