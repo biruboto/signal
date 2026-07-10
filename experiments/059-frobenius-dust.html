@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>frobenius dust — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #030509;
+      color: #eef7ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(760px, calc(100vw - 36px));
+      color: rgba(232, 242, 255, 0.72);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.95);
+      user-select: none;
+    }
+    .title {
+      color: rgba(250, 253, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(173, 229, 255, 0.95); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">frobenius dust</div>
+    <div id="caption">two coprime coins try to buy every number. the unreachable amounts become dust; the largest gap burns like a small forbidden moon.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let a, b, limit, grid = [], dust = [], bought = [];
+    let daySeed = 0;
+    let t = 0;
+    let readoutEl;
+    const palette = [
+      [92, 169, 255],
+      [132, 234, 202],
+      [247, 202, 111],
+      [233, 125, 172],
+      [197, 155, 255]
+    ];
+
+    function gcd(x, y) {
+      while (y !== 0) [x, y] = [y, x % y];
+      return Math.abs(x);
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetField();
+    }
+
+    function resetField() {
+      randomSeed(daySeed + 59017);
+      noiseSeed(daySeed + 59017);
+      const pairs = [[5, 9], [7, 11], [8, 13], [9, 14], [11, 16], [10, 17], [13, 18]];
+      [a, b] = pairs[daySeed % pairs.length];
+      if (gcd(a, b) !== 1) b += 1;
+      limit = a * b;
+      bought = new Array(limit + 1).fill(false);
+      bought[0] = true;
+      for (let n = 0; n <= limit; n++) {
+        if (!bought[n]) continue;
+        if (n + a <= limit) bought[n + a] = true;
+        if (n + b <= limit) bought[n + b] = true;
+      }
+      dust = [];
+      grid = [];
+      const cols = Math.ceil(Math.sqrt(limit + 1) * width / Math.max(height, 1));
+      const rows = Math.ceil((limit + 1) / cols);
+      const cell = Math.min(width / (cols + 2), height / (rows + 2));
+      const ox = (width - cols * cell) / 2 + cell * 0.5;
+      const oy = (height - rows * cell) / 2 + cell * 0.25;
+      for (let n = 0; n <= limit; n++) {
+        const col = n % cols;
+        const row = Math.floor(n / cols);
+        const isDust = !bought[n];
+        const p = {
+          n,
+          x: ox + col * cell,
+          y: oy + row * cell,
+          cell,
+          dust: isDust,
+          r: isDust ? random(0.45, 1.25) : random(0.15, 0.5),
+          phase: random(TAU),
+          family: (n * a + b) % palette.length,
+          reachableAt: minSteps(n)
+        };
+        grid.push(p);
+        if (isDust) dust.push(p);
+      }
+    }
+
+    function minSteps(n) {
+      let best = Infinity;
+      for (let i = 0; i * a <= n; i++) {
+        const rest = n - i * a;
+        if (rest % b === 0) best = Math.min(best, i + rest / b);
+      }
+      return best;
+    }
+
+    function draw() {
+      t += 0.006;
+      background(3, 5, 9, 40);
+      drawResidueVeil();
+      noStroke();
+      const frontier = (frameCount * 0.18) % (limit + 1);
+      let largest = dust.length ? dust[dust.length - 1].n : 0;
+
+      for (const p of grid) {
+        const pulse = 0.5 + 0.5 * sin(t * 7 + p.phase + p.n * 0.13);
+        const distFront = abs(p.n - frontier);
+        const wake = exp(-distFront * 0.05);
+        if (p.dust) {
+          const c = palette[p.family];
+          const forbidden = p.n === largest ? 1 : 0;
+          fill(c[0], c[1], c[2], 80 + 90 * pulse + 55 * forbidden);
+          const wob = p.cell * (0.10 + 0.05 * noise(p.n, t * 2));
+          circle(p.x + cos(p.phase + t * 13) * wob, p.y + sin(p.phase * 1.7 + t * 9) * wob, p.cell * (0.36 + p.r * 0.22 + forbidden * 0.35));
+        } else {
+          const k = p.reachableAt === Infinity ? 0 : p.reachableAt;
+          const hue = palette[k % palette.length];
+          fill(hue[0], hue[1], hue[2], 20 + 70 * wake);
+          circle(p.x, p.y, p.cell * (0.10 + 0.22 * wake));
+        }
+      }
+
+      stroke(190, 220, 255, 38);
+      strokeWeight(1);
+      for (let i = 0; i < dust.length; i++) {
+        for (let j = i + 1; j < dust.length; j++) {
+          const u = dust[i], v = dust[j];
+          if ((u.n + v.n + frameCount) % a === 0 || abs(u.n - v.n) === b - a) {
+            const shimmer = 18 + 24 * sin(t * 5 + u.n + v.n);
+            stroke(180, 220, 255, shimmer);
+            line(u.x, u.y, v.x, v.y);
+          }
+        }
+      }
+
+      noStroke();
+      fill(255, 248, 209, 180);
+      const moon = grid[largest];
+      if (moon) circle(moon.x, moon.y, moon.cell * (0.75 + 0.12 * sin(t * 11)));
+
+      readoutEl.textContent = `coin basis ${a}/${b} · unreachable count ${dust.length} · frobenius gap ${largest} · conductor ${(a - 1) * (b - 1)}`;
+    }
+
+    function drawResidueVeil() {
+      noFill();
+      strokeWeight(1);
+      const rings = 9;
+      for (let r = 0; r < rings; r++) {
+        const c = palette[r % palette.length];
+        stroke(c[0], c[1], c[2], 12);
+        beginShape();
+        const yBase = height * (r + 1) / (rings + 1);
+        for (let x = -20; x <= width + 20; x += 22) {
+          const y = yBase + sin(x * 0.01 + t * (1.4 + r * 0.1) + r) * 22 + noise(x * 0.004, r, t) * 42;
+          vertex(x, y);
+        }
+        endShape();
+      }
+    }
+  </script>
+</body>
+</html>

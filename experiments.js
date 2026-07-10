@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '059-frobenius-dust', title: 'frobenius dust', date: '2026-07-10' },
   { id: '058-hensel-breath', title: 'hensel breath', date: '2026-07-09' },
   { id: '057-adic-snow', title: 'adic snow', date: '2026-07-08' },
   { id: '056-stern-drift', title: 'stern drift', date: '2026-07-07' },
