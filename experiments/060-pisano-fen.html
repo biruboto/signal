@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pisano fen — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #020407;
+      color: #eef8ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(780px, calc(100vw - 36px));
+      color: rgba(229, 243, 255, 0.72);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.95);
+      user-select: none;
+    }
+    .title {
+      color: rgba(250, 253, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(164, 229, 255, 0.95); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">pisano fen</div>
+    <div id="caption">fibonacci pairs walk modulo a small moon. each return floods the marsh; residues that remember many visits rise into fen-islands.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let m, period, cell, ox, oy;
+    let a = 0, b = 1, step = 0;
+    let deposits = [];
+    let orbit = [];
+    let readoutEl;
+    let daySeed = 0;
+    const moons = [17, 19, 21, 23, 25, 27, 29, 31, 34, 37];
+    const ink = [
+      [89, 190, 255],
+      [113, 239, 196],
+      [246, 217, 125],
+      [226, 128, 197],
+      [174, 151, 255]
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetFen();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetFen();
+    }
+
+    function resetFen() {
+      randomSeed(daySeed + 60013);
+      noiseSeed(daySeed + 60013);
+      m = moons[daySeed % moons.length];
+      deposits = Array.from({ length: m }, () => Array(m).fill(0));
+      orbit = [];
+      a = 0;
+      b = 1;
+      step = 0;
+      period = findPisano(m);
+      cell = Math.min(width * 0.84 / m, height * 0.72 / m);
+      ox = (width - cell * (m - 1)) / 2;
+      oy = (height - cell * (m - 1)) / 2 - cell * 0.25;
+      background(2, 4, 7);
+    }
+
+    function findPisano(modulus) {
+      let x = 0;
+      let y = 1;
+      for (let i = 1; i <= modulus * modulus * 6; i++) {
+        const z = (x + y) % modulus;
+        x = y;
+        y = z;
+        if (x === 0 && y === 1) return i;
+      }
+      return modulus * modulus;
+    }
+
+    function draw() {
+      background(2, 4, 7, 38);
+      drawGrid();
+      const pulses = Math.max(4, Math.floor(1200 / Math.max(period, 1)));
+      for (let k = 0; k < pulses; k++) advancePair();
+      drawOrbit();
+      drawReadout();
+    }
+
+    function advancePair() {
+      deposits[a][b] = Math.min(90, deposits[a][b] + 1);
+      orbit.push({ a, b, step, age: 0, flood: a === 0 && b === 1 });
+      if (orbit.length > 520) orbit.shift();
+      const c = (a + b) % m;
+      a = b;
+      b = c;
+      step++;
+    }
+
+    function drawGrid() {
+      noStroke();
+      for (let x = 0; x < m; x++) {
+        for (let y = 0; y < m; y++) {
+          deposits[x][y] *= 0.9965;
+          const d = deposits[x][y];
+          const px = ox + x * cell;
+          const py = oy + y * cell;
+          const basin = (x * x + 3 * y + daySeed) % ink.length;
+          const col = ink[basin];
+          const residueWind = noise(x * 0.17, y * 0.17, frameCount * 0.004);
+          const r = cell * (0.10 + Math.sqrt(d) * 0.038 + residueWind * 0.04);
+          fill(col[0], col[1], col[2], 12 + Math.min(145, d * 3.2));
+          circle(px, py, r * 2.0);
+          if (((x * y + x + y) % m) === ((frameCount / 9) | 0) % m) {
+            fill(230, 245, 255, 9);
+            circle(px, py, cell * 0.08);
+          }
+        }
+      }
+    }
+
+    function drawOrbit() {
+      noFill();
+      strokeWeight(Math.max(1, cell * 0.035));
+      for (let i = 1; i < orbit.length; i++) {
+        const p = orbit[i - 1];
+        const q = orbit[i];
+        p.age++;
+        q.age++;
+        const fade = map(i, 0, orbit.length - 1, 0, 1);
+        const col = ink[(q.step + m) % ink.length];
+        stroke(col[0], col[1], col[2], 18 + fade * 92);
+        const x1 = ox + p.a * cell;
+        const y1 = oy + p.b * cell;
+        const x2 = ox + q.a * cell;
+        const y2 = oy + q.b * cell;
+        const bow = sin((q.step * 0.37 + frameCount * 0.018)) * cell * 0.18;
+        bezier(x1, y1, (x1 + x2) / 2 + bow, y1, (x1 + x2) / 2 - bow, y2, x2, y2);
+        if (q.flood) {
+          noStroke();
+          fill(218, 243, 255, 42 * fade);
+          circle(x2, y2, cell * (1.1 + 0.34 * sin(frameCount * 0.08)));
+        }
+      }
+      const headX = ox + a * cell;
+      const headY = oy + b * cell;
+      noStroke();
+      fill(245, 252, 255, 220);
+      circle(headX, headY, cell * 0.46);
+      fill(86, 206, 255, 120);
+      circle(headX, headY, cell * (0.9 + 0.18 * sin(frameCount * 0.13)));
+    }
+
+    function drawReadout() {
+      const heightSum = deposits.flat().reduce((s, v) => s + v, 0);
+      const basinCount = deposits.flat().filter(v => v > 0.8).length;
+      const phase = step % period;
+      readoutEl.textContent = `mod ${m} · pisano period ${period} · phase ${phase}/${period} · wet residues ${basinCount}/${m*m} · silt ${heightSum.toFixed(1)}`;
+    }
+  </script>
+</body>
+</html>
