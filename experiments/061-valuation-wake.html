@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>valuation wake — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #03050a;
+      color: #edf7ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(820px, calc(100vw - 36px));
+      color: rgba(229, 241, 255, 0.72);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.95);
+      user-select: none;
+    }
+    .title {
+      color: rgba(250, 253, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(170, 232, 255, 0.95); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">valuation wake</div>
+    <div id="caption">integers cross a dark channel. only their hidden divisibility is visible: powers of two fall downward, powers of three drift sideways, and rare common depths leave a phosphor wake.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let readoutEl;
+    let daySeed = 0;
+    let n = 1;
+    let wake = [];
+    let wells = [];
+    let maxWake;
+    const palette = [
+      [94, 205, 255],
+      [118, 246, 189],
+      [250, 218, 119],
+      [230, 133, 207],
+      [178, 154, 255]
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      resetWake();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      resetWake();
+    }
+
+    function resetWake() {
+      randomSeed(daySeed + 61017);
+      noiseSeed(daySeed + 61017);
+      n = 1 + (daySeed % 97) * 11;
+      maxWake = Math.max(260, Math.floor(width * height / 3600));
+      wake = [];
+      wells = [];
+      for (let i = 0; i < 34; i++) {
+        wells.push({
+          x: random(width),
+          y: random(height),
+          p: random([2, 3, 5]),
+          phase: random(TAU),
+          r: random(40, 160)
+        });
+      }
+      background(3, 5, 10);
+    }
+
+    function valuation(value, prime) {
+      if (value <= 0) return 0;
+      let c = 0;
+      while (value % prime === 0) {
+        value = Math.floor(value / prime);
+        c++;
+      }
+      return c;
+    }
+
+    function addIntegers() {
+      const batch = Math.max(5, Math.floor(width / 160));
+      for (let i = 0; i < batch; i++) {
+        const v2 = valuation(n, 2);
+        const v3 = valuation(n, 3);
+        const v5 = valuation(n, 5);
+        const angle = (n * 2.399963229728653 + v3 * 0.31 + sin(n * 0.013) * 0.2) % TAU;
+        const radius = Math.sqrt((n * 37 + daySeed) % 997) / Math.sqrt(997);
+        const cx = width * 0.5 + cos(angle) * radius * width * 0.42;
+        const cy = height * 0.50 + sin(angle) * radius * height * 0.38;
+        const sink = v2 - v3;
+        const drift = v3 * 13 - v5 * 7;
+        const x = cx + drift + noise(n * 0.021, v2) * 36 - 18;
+        const y = cy + sink * 26 + noise(v3, n * 0.017) * 34 - 17;
+        wake.push({ n, x, y, v2, v3, v5, age: 0, charge: 1 + v2 + v3 * 1.2 + v5 * 0.8 });
+        n++;
+      }
+      while (wake.length > maxWake) wake.shift();
+    }
+
+    function draw() {
+      background(3, 5, 10, 32);
+      addIntegers();
+      drawWells();
+      drawWake();
+      drawReadout();
+    }
+
+    function drawWells() {
+      noFill();
+      wells.forEach((w, i) => {
+        const pulse = sin(frameCount * 0.012 + w.phase) * 0.5 + 0.5;
+        const col = palette[(w.p + i) % palette.length];
+        stroke(col[0], col[1], col[2], 9 + pulse * 18);
+        strokeWeight(1);
+        const rr = w.r * (0.75 + pulse * 0.45);
+        ellipse(w.x + sin(frameCount * 0.003 + i) * 18, w.y + cos(frameCount * 0.004 + i) * 14, rr, rr * 0.48);
+      });
+    }
+
+    function drawWake() {
+      blendMode(ADD);
+      for (let i = 0; i < wake.length; i++) {
+        const p = wake[i];
+        p.age++;
+        const life = i / Math.max(1, wake.length - 1);
+        const common = Math.min(p.v2, p.v3);
+        const col = palette[(p.v2 + p.v3 * 2 + p.v5 * 3) % palette.length];
+        const shimmer = noise(p.n * 0.017, frameCount * 0.008);
+        const size = 2.2 + Math.sqrt(p.charge) * 4.5 + common * 8 + shimmer * 3;
+        noStroke();
+        fill(col[0], col[1], col[2], 14 + life * 88 + common * 18);
+        circle(p.x, p.y, size);
+        if (common > 0 || p.v5 > 1) {
+          stroke(230, 244, 255, 20 + common * 22);
+          strokeWeight(0.8 + common * 0.45);
+          noFill();
+          const r = size * (1.8 + 0.22 * sin(frameCount * 0.05 + p.n));
+          arc(p.x, p.y, r * 2.1, r, (p.n % 17) * 0.37, (p.n % 17) * 0.37 + PI * 1.12);
+        }
+        if (i > 0 && i % 3 === 0) {
+          const q = wake[i - 1];
+          const affinity = Math.abs((p.v2 - q.v2) - (p.v3 - q.v3));
+          if (affinity <= 1) {
+            stroke(col[0], col[1], col[2], 10 + life * 38);
+            strokeWeight(0.7);
+            line(q.x, q.y, p.x, p.y);
+          }
+        }
+      }
+      blendMode(BLEND);
+    }
+
+    function drawReadout() {
+      const recent = wake.slice(-80);
+      const depth2 = recent.reduce((s, p) => s + p.v2, 0);
+      const depth3 = recent.reduce((s, p) => s + p.v3, 0);
+      const coincidences = recent.filter(p => p.v2 > 0 && p.v3 > 0).length;
+      const last = wake[wake.length - 1];
+      readoutEl.textContent = `integer ${last ? last.n : n} · 2-adic depth ${depth2} · 3-adic drift ${depth3} · common wakes ${coincidences}/80 · memory ${wake.length}`;
+    }
+  </script>
+</body>
+</html>
