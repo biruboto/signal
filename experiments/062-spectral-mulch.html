@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>spectral mulch — Signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #030407;
+      color: #eef8ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    canvas { display: block; }
+    .panel {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      max-width: min(840px, calc(100vw - 36px));
+      color: rgba(226, 240, 255, 0.72);
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 18px rgba(0,0,0,0.95);
+      user-select: none;
+    }
+    .title {
+      color: rgba(250, 253, 255, 0.96);
+      text-transform: lowercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 6px;
+    }
+    .readout { color: rgba(171, 236, 211, 0.96); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">spectral mulch</div>
+    <div id="caption">a graph composts its own edges. random walkers leave weight behind; the slowest difference between neighborhoods becomes visible as pale fungus.</div>
+    <div id="readout" class="readout"></div>
+  </div>
+
+  <script>
+    let nodes = [];
+    let edges = [];
+    let walkers = [];
+    let readoutEl;
+    let daySeed = 0;
+    let tick = 0;
+    let modeIndex = 1;
+    const palette = [
+      [102, 218, 255],
+      [136, 250, 190],
+      [245, 210, 116],
+      [224, 128, 211]
+    ];
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+      readoutEl = document.getElementById('readout');
+      daySeed = Math.floor(Date.now() / 86400000);
+      rebuild();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+
+    function rebuild() {
+      randomSeed(daySeed + 62031);
+      noiseSeed(daySeed + 62031);
+      tick = 0;
+      modeIndex = 1 + (daySeed % 4);
+      const count = Math.max(42, Math.min(118, Math.floor(width * height / 11800)));
+      nodes = [];
+      edges = [];
+      walkers = [];
+
+      for (let i = 0; i < count; i++) {
+        const a = i * 2.399963229728653;
+        const r = Math.sqrt((i + 0.5) / count);
+        const jitter = 0.08 + 0.05 * noise(i * 0.13, daySeed);
+        nodes.push({
+          x: width * (0.5 + cos(a) * r * (0.41 + jitter * sin(i))),
+          y: height * (0.52 + sin(a) * r * (0.38 + jitter * cos(i * 0.7))),
+          mass: 0,
+          oldMass: 0,
+          deg: 0,
+          phase: random(TAU),
+          mode: 0,
+          nbrs: []
+        });
+      }
+
+      for (let i = 0; i < count; i++) {
+        const candidates = [];
+        for (let j = 0; j < count; j++) {
+          if (i === j) continue;
+          const d = dist(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y);
+          candidates.push({ j, d });
+        }
+        candidates.sort((a, b) => a.d - b.d);
+        const k = 2 + ((i + daySeed) % 3);
+        for (let c = 0; c < k; c++) addEdge(i, candidates[c].j, candidates[c].d);
+      }
+
+      for (let i = 0; i < count; i++) {
+        nodes[i].deg = nodes[i].nbrs.length;
+        nodes[i].mode = sin((i + 1) * modeIndex * 1.618) + 0.45 * cos((i + daySeed) * 0.37);
+      }
+      orthogonalizeMode();
+
+      const walkerCount = Math.max(34, Math.floor(count * 0.82));
+      for (let w = 0; w < walkerCount; w++) {
+        walkers.push({
+          node: Math.floor(random(count)),
+          t: random(1),
+          hue: Math.floor(random(palette.length)),
+          residue: random(0.4, 1.3)
+        });
+      }
+      background(3, 4, 7);
+    }
+
+    function addEdge(a, b, d) {
+      const keyA = Math.min(a, b), keyB = Math.max(a, b);
+      for (const e of edges) if (e.a === keyA && e.b === keyB) return;
+      const weight = 1 / Math.max(16, d);
+      edges.push({ a: keyA, b: keyB, w: weight, compost: 0 });
+      nodes[a].nbrs.push({ j: b, w: weight });
+      nodes[b].nbrs.push({ j: a, w: weight });
+    }
+
+    function orthogonalizeMode() {
+      let mean = 0;
+      for (const n of nodes) mean += n.mode;
+      mean /= nodes.length;
+      let scale = 0;
+      for (const n of nodes) {
+        n.mode -= mean;
+        scale += n.mode * n.mode;
+      }
+      scale = Math.sqrt(scale / nodes.length) || 1;
+      for (const n of nodes) n.mode /= scale;
+    }
+
+    function draw() {
+      background(3, 4, 7, 28);
+      tick++;
+      relaxSpectralDust();
+      drawEdges();
+      moveWalkers();
+      drawNodes();
+      if (tick % 10 === 0) updateReadout();
+    }
+
+    function relaxSpectralDust() {
+      for (const n of nodes) n.oldMass = n.mass;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        let lap = 0;
+        let total = 0;
+        for (const nb of n.nbrs) {
+          lap += nb.w * (nodes[nb.j].oldMass - n.oldMass);
+          total += nb.w;
+        }
+        const forcing = 0.007 * n.mode * sin(tick * 0.011 + n.phase);
+        n.mass = constrain(n.oldMass * 0.988 + lap * 4.8 + forcing + 0.0007, -1.8, 3.4);
+      }
+      for (const e of edges) {
+        const delta = abs(nodes[e.a].mass - nodes[e.b].mass);
+        e.compost = e.compost * 0.982 + delta * e.w * 5.4;
+      }
+    }
+
+    function moveWalkers() {
+      noStroke();
+      for (const w of walkers) {
+        const here = nodes[w.node];
+        if (!here.nbrs.length) continue;
+        let best = here.nbrs[Math.floor(random(here.nbrs.length))];
+        let score = -Infinity;
+        for (const nb of here.nbrs) {
+          const there = nodes[nb.j];
+          const s = there.mass + there.mode * 0.24 + random(-0.22, 0.22);
+          if (s > score) { score = s; best = nb; }
+        }
+        const next = nodes[best.j];
+        const mx = lerp(here.x, next.x, random(0.18, 0.82));
+        const my = lerp(here.y, next.y, random(0.18, 0.82));
+        const col = palette[w.hue];
+        const glow = 12 + 18 * max(0, next.mass);
+        fill(col[0], col[1], col[2], 12);
+        circle(mx, my, glow);
+        fill(col[0], col[1], col[2], 80);
+        circle(mx, my, 2.1 + w.residue);
+        here.mass += 0.018 * w.residue;
+        w.node = best.j;
+        w.hue = (w.hue + (random() < 0.08 ? 1 : 0)) % palette.length;
+      }
+    }
+
+    function drawEdges() {
+      blendMode(ADD);
+      for (const e of edges) {
+        const a = nodes[e.a], b = nodes[e.b];
+        const m = constrain(e.compost, 0, 1.9);
+        const spectral = abs(a.mode - b.mode);
+        stroke(78 + spectral * 24, 160 + m * 34, 185 + spectral * 42, 10 + m * 35);
+        strokeWeight(0.55 + m * 2.1);
+        line(a.x, a.y, b.x, b.y);
+      }
+      blendMode(BLEND);
+    }
+
+    function drawNodes() {
+      noStroke();
+      for (const n of nodes) {
+        const m = constrain(n.mass, -1.5, 3);
+        const warm = m > 0 ? m : 0;
+        const cold = m < 0 ? -m : 0;
+        fill(110 + warm * 35, 230 - cold * 40, 198 + cold * 48, 28 + warm * 36);
+        circle(n.x, n.y, 6 + warm * 8 + abs(n.mode) * 2.5);
+        fill(235, 252, 242, 90 + warm * 35);
+        circle(n.x, n.y, 1.4 + warm * 2.2);
+      }
+    }
+
+    function updateReadout() {
+      let energy = 0;
+      let cut = 0;
+      for (const e of edges) {
+        const d = nodes[e.a].mass - nodes[e.b].mass;
+        energy += d * d * e.w;
+        cut += abs(nodes[e.a].mode - nodes[e.b].mode) * e.w;
+      }
+      readoutEl.textContent = `${nodes.length} nodes · ${edges.length} edges · slow cut ${cut.toFixed(3)} · compost energy ${energy.toFixed(3)}`;
+    }
+  </script>
+</body>
+</html>
