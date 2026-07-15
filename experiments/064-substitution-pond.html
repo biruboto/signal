@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>substitution pond — Signal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;overflow:hidden;background:#05090b;color:#d9e4dc;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block}
+  #panel{position:fixed;left:19px;bottom:17px;max-width:min(740px,calc(100vw - 38px));line-height:1.5;letter-spacing:.035em;pointer-events:none;text-shadow:0 1px 16px #000}
+  #title{color:#f0f4e9;letter-spacing:.16em;margin-bottom:5px}
+  #readout{color:#a4d7be;margin-top:4px}
+</style>
+</head>
+<body>
+<div id="panel"><div id="title">substitution pond</div><div>one shore says <i>reed → reed ripple</i>; the other answers <i>ripple → reed</i>. no period arrives, but the water keeps finding familiar distances.</div><div id="readout"></div></div>
+<script>
+let word='', marks=[], t=0, offset=0, scale=1, readout;
+const ink=[[92,202,177],[126,174,246],[235,202,119],[211,132,192]];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(Math.min(2,window.devicePixelRatio||1));readout=document.getElementById('readout');build();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+function build(){
+  word='A'; while(word.length<8192){let next='';for(const c of word)next+=c==='A'?'AB':'A';word=next;} 
+  marks=[]; const n=Math.max(280,Math.min(1500,Math.floor(width*1.5)));
+  for(let i=0;i<n;i++){
+    const k=(i*7+Math.floor(width+height))%word.length;
+    let depth=0, probe=k;
+    while(probe>0&&probe%2===0){depth++;probe/=2;}
+    marks.push({k,bit:word[k]==='A'?1:-1,depth,phase:noise(k*.017,depth)*TWO_PI});
+  }
+  offset=0; background(5,9,11);
+}
+function draw(){
+  t+=0.004; background(5,9,11,34);
+  const shore=height*.53, span=width*.92, left=width*.04;
+  drawCurrents(shore,left,span);
+  blendMode(ADD); noStroke();
+  const n=marks.length;
+  for(let i=0;i<n;i++){
+    const m=marks[(i+offset)%n];
+    const x=left+i/(n-1)*span;
+    const local=sin(t*3+m.phase+i*.031);
+    const lift=m.bit*(18+5*m.depth)+local*(5+m.depth*1.8);
+    const y=shore+lift;
+    const col=ink[(m.depth+(m.bit>0?0:2))%ink.length];
+    const alpha=20+Math.min(110,28*m.depth)+30*(.5+.5*local);
+    fill(col[0],col[1],col[2],alpha);
+    const w=1+Math.min(5,m.depth*.65);
+    rect(x,y,w,2.2+m.depth*.58);
+    if(m.depth>1){fill(col[0],col[1],col[2],12+m.depth*5);circle(x,y,12+m.depth*8);}
+  }
+  blendMode(BLEND);
+  stroke(185,224,204,35);strokeWeight(1);line(left,shore,left+span,shore);
+  if(frameCount%16===0) updateReadout();
+}
+function drawCurrents(shore,left,span){
+  noFill();strokeWeight(1);
+  for(let band=0;band<9;band++){
+    const c=ink[band%ink.length];stroke(c[0],c[1],c[2],11+band*2);
+    beginShape();
+    for(let x=left;x<=left+span;x+=12){
+      const q=(x-left)/span;
+      const wave=sin(q*TWO_PI*(2+band*.43)+t*(1.2+band*.08))* (3+band*.65);
+      const nested=sin(q*TWO_PI*Math.pow(2,band%4)+t*2.1)*2.5;
+      vertex(x,shore+(band-4)*18+wave+nested);
+    }endShape();
+  }
+}
+function updateReadout(){
+  let sample='';for(let i=0;i<34;i++)sample+=word[(i+offset)%word.length];
+  readout.textContent=`substitution A→AB · B→A  /  window ${sample}  /  click to shift the shore`;
+}
+function mousePressed(){offset=(offset+377)%marks.length;}
+</script>
+</body>
+</html>
