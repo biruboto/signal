@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '065-orbit-bruise', title: 'orbit bruise', date: '2026-07-16' },
   { id: '064-substitution-pond', title: 'substitution pond', date: '2026-07-15' },
   { id: '063-convergent-loom', title: 'convergent loom', date: '2026-07-14' },
   { id: '062-spectral-mulch', title: 'spectral mulch', date: '2026-07-13' },

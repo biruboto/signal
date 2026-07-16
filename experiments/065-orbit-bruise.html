@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>orbit bruise</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0d; color: #d7d4ca; }
+    canvas { display: block; }
+    #readout { position: fixed; left: 18px; bottom: 16px; font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; color: #9ca39d; pointer-events: none; }
+    #caption { position: fixed; right: 18px; top: 16px; max-width: 270px; text-align: right; font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .06em; color: #747b78; pointer-events: none; }
+    b { color: #c7b58a; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>orbit bruise</b><br>each return leaves a pressure mark<br>click to change the initial wound</div>
+  <div id="readout">seeking a recurrence…</div>
+  <script>
+    let marks, seen, seed, t = 0, hits = 0, cycle = 0;
+    const readout = document.getElementById('readout');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      resetOrbit(floor(random(1, 2147483646)));
+    }
+
+    function resetOrbit(s) {
+      seed = s >>> 0;
+      marks = createGraphics(windowWidth, windowHeight);
+      marks.pixelDensity(1);
+      marks.background(8, 10, 13);
+      seen = new Map();
+      t = hits = cycle = 0;
+      blendMode(BLEND);
+    }
+
+    function next(state) {
+      state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+      return state >>> 0;
+    }
+
+    function draw() {
+      background(8, 10, 13, 22);
+      image(marks, 0, 0);
+      let steps = max(25, floor((width * height) / 9000));
+      for (let i = 0; i < steps; i++) step();
+      noStroke();
+      fill(225, 213, 170, 140);
+      circle(map((seed & 65535), 0, 65535, 0, width), map((seed >>> 16), 0, 65535, 0, height), 2);
+      readout.textContent = `state ${hex(seed, 8)}  ·  ${t.toLocaleString()} steps  ·  ${hits.toLocaleString()} returns${cycle ? '  ·  cycle ' + cycle : ''}`;
+    }
+
+    function step() {
+      seed = next(seed); t++;
+      const a = (seed & 65535) / 65535;
+      const b = (seed >>> 16) / 65535;
+      const x = floor(a * width), y = floor(b * height);
+      const key = floor(a * 89) + ':' + floor(b * 55);
+      const before = seen.get(key);
+      if (before !== undefined) {
+        const age = t - before;
+        hits++;
+        if (!cycle && age < 120000) cycle = age;
+        const r = constrain(1.5 + log(age + 1) * .8, 2, 12);
+        marks.noStroke();
+        marks.fill(132 + (age % 40), 83, 116, 20);
+        marks.circle(x, y, r * 2.6);
+        marks.fill(202, 178, 119, 55);
+        marks.circle(x, y, r * .45);
+      } else {
+        marks.noStroke();
+        marks.fill(67, 91, 104, 10);
+        marks.circle(x, y, 1.2);
+      }
+      seen.set(key, t);
+      if (seen.size > 9000) {
+        const first = seen.keys().next().value;
+        seen.delete(first);
+      }
+    }
+
+    function mousePressed() { resetOrbit(floor(random(1, 2147483646))); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); resetOrbit(seed || 1); }
+  </script>
+</body>
+</html>
