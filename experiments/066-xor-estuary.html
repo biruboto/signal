@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>xor estuary</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07100f; color: #cbd8c5; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(217,232,207,.64); pointer-events: none; }
+    #caption b { color: #d9e8cf; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>xor estuary</b><br><span id="readout"></span><br>click: introduce a new upstream rule</div>
+  <script>
+    let cols, rows, cell, field, nextField;
+    let tick = 0, seed = 0, drift = 0;
+    const readout = document.getElementById('readout');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      buildField();
+    }
+
+    function buildField() {
+      cell = max(7, floor(min(width, height) / 72));
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+      field = Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => {
+        const ridge = sin(x * 0.19 + seed) + sin(y * 0.13 - seed * 0.7);
+        return (noise(x * 0.095 + seed, y * 0.095 - seed) > 0.62 + ridge * 0.045) ? 1 : 0;
+      }));
+      tick = 0;
+    }
+
+    function draw() {
+      background(7, 16, 15);
+      const strideA = 5 + ((floor(tick / 23) + seed * 3) % 11);
+      const strideB = 3 + ((floor(tick / 41) + seed * 5) % 13);
+      const tide = sin(tick * 0.021) * 0.5 + 0.5;
+      nextField = Array.from({ length: rows }, () => Array(cols).fill(0));
+      let living = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const a = field[y][x];
+          const b = field[(y + strideB) % rows][(x + strideA) % cols];
+          const c = field[(y + rows - strideA) % rows][(x + strideB) % cols];
+          const xor = a ^ b;
+          const carry = (a + b + c >= 2) ? 1 : 0;
+          const value = (xor ^ (tick % 7 === 0 ? carry : 0));
+          nextField[y][x] = value;
+          if (value) living++;
+
+          if (value) {
+            const edge = a !== b;
+            const hue = edge ? 162 + 35 * tide : 104 + 20 * tide;
+            const alpha = edge ? 215 : 118;
+            fill(`hsla(${hue}, ${edge ? 48 : 28}%, ${edge ? 62 : 43}%, ${alpha / 255})`);
+            const inset = edge ? 0 : cell * 0.18;
+            rect(x * cell + inset, y * cell + inset, cell - inset * 2, cell - inset * 2);
+          }
+        }
+      }
+      field = nextField;
+      tick++;
+      drift = (strideA * 17 + strideB * 31 + tick) % 997;
+      readout.textContent = `shift ${strideA}:${strideB}  ·  difference retained ${living} cells  ·  residue ${drift}`;
+    }
+
+    function mousePressed() {
+      seed = (seed + 1) % 97;
+      noiseSeed(seed * 7919 + 17);
+      buildField();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      buildField();
+    }
+  </script>
+</body>
+</html>
