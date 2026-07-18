@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '067-palimpsest-current', title: 'palimpsest current', date: '2026-07-18' },
   { id: '066-xor-estuary', title: 'xor estuary', date: '2026-07-17' },
   { id: '065-orbit-bruise', title: 'orbit bruise', date: '2026-07-16' },
   { id: '064-substitution-pond', title: 'substitution pond', date: '2026-07-15' },

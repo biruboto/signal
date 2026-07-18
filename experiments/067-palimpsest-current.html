@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>palimpsest current</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #090b14; color: #d8d7c8; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(216,215,200,.62); pointer-events: none; }
+    #caption b { color: #e7e4cf; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>palimpsest current</b><br><span id="readout"></span><br>click: exhume a different remainder</div>
+  <script>
+    let cell, cols, rows, phase = 0, modulus = 11, offset = 0;
+    const readout = document.getElementById('readout');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      measure();
+    }
+
+    function measure() {
+      cell = max(7, floor(min(width, height) / 78));
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+    }
+
+    function draw() {
+      background(9, 11, 20);
+      const t = floor(frameCount / 9) + phase;
+      let exposed = 0, crossings = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          // A moving diagonal is written over a static multiplication table.
+          // Only disagreements survive; the page remembers its overwritten arithmetic.
+          const oldMark = ((x + offset) * (y + 1) + offset * 3) % modulus;
+          const newMark = (x * 2 + y * 3 + t) % modulus;
+          const scar = (oldMark - newMark + modulus) % modulus;
+          const threshold = 1 + ((x + y + t) % 4 === 0 ? 1 : 0);
+          if (scar < threshold || scar === modulus - 1) {
+            exposed++;
+            const crossing = scar === 0;
+            if (crossing) crossings++;
+            const hue = crossing ? 43 + 15 * sin(t * .03) : 202 + scar * 9;
+            const inset = crossing ? 0 : cell * .19;
+            const alpha = crossing ? 215 : 74 + scar * 18;
+            fill(`hsla(${hue}, ${crossing ? 70 : 48}%, ${crossing ? 71 : 58}%, ${alpha / 255})`);
+            rect(x * cell + inset, y * cell + inset, cell - inset * 2, cell - inset * 2);
+          }
+        }
+      }
+      const drift = ((t % modulus) + modulus) % modulus;
+      readout.textContent = `mod ${modulus} · overwritten remainder ${drift} · ${exposed} marks exposed · ${crossings} crossings`;
+    }
+
+    function mousePressed() {
+      const options = [7, 11, 13, 17, 19];
+      modulus = options[(options.indexOf(modulus) + 1) % options.length];
+      offset = (offset + 3) % modulus;
+      phase += 17;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      measure();
+    }
+  </script>
+</body>
+</html>
