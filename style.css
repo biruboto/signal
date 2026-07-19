@@ -62,6 +62,12 @@ h1 {
   color: var(--fg);
 }
 
+a:focus-visible {
+  outline: 1px solid var(--fg);
+  outline-offset: 4px;
+  color: var(--fg);
+}
+
 h2 {
   font-size: 0.75rem;
   text-transform: uppercase;
