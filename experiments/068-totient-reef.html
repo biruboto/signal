@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>totient reef</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #081014; color: #cad8d0; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(202,216,208,.64); pointer-events: none; }
+    #caption b { color: #e1eee6; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="caption"><b>totient reef</b><br><span id="readout"></span><br>click: change the tidal denominator</div>
+  <script>
+    let cell, cols, rows, modulus = 29, phase = 0, tide = 0;
+    let relief = [];
+    const readout = document.getElementById('readout');
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      growReef();
+    }
+
+    function coprime(a, b) {
+      while (b) [a, b] = [b, a % b];
+      return a === 1;
+    }
+
+    function growReef() {
+      cell = max(6, floor(min(width, height) / 82));
+      cols = ceil(width / cell) + 2;
+      rows = ceil(height / cell) + 2;
+      relief = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = 1 + ((x * 7 + y * 11 + phase * 3) % modulus);
+          const k = 1 + ((x * 3 + y * 5 + phase) % modulus);
+          // A cell can settle only when its two local periods do not share a divisor.
+          if (coprime(n, k)) relief[y][x] = 1;
+        }
+      }
+    }
+
+    function draw() {
+      background(8, 16, 20);
+      const wave = floor(frameCount / 5) + tide;
+      let dry = 0, lit = 0, coves = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (!relief[y][x]) continue;
+          const n = 1 + ((x * 7 + y * 11 + phase * 3) % modulus);
+          const pulse = (x * 13 + y * 17 + wave) % n;
+          const neighbor = relief[(y + 1) % rows][x] + relief[y][(x + 1) % cols];
+          const exposed = pulse < 2 + (neighbor === 2 ? 1 : 0);
+          if (!exposed) continue;
+          lit++;
+          const rim = pulse === 0;
+          if (rim) coves++;
+          const hue = rim ? 39 + 10 * sin(wave * .025) : 171 + (n % 6) * 7;
+          const inset = rim ? 0 : cell * .16;
+          const alpha = rim ? 220 : 72 + (n % 4) * 20;
+          fill(`hsla(${hue}, ${rim ? 67 : 38}%, ${rim ? 68 : 52}%, ${alpha / 255})`);
+          rect(x * cell + inset, y * cell + inset, cell - inset * 2, cell - inset * 2);
+          if (pulse === 0) dry++;
+        }
+      }
+      readout.textContent = `denominator ${modulus} · ${lit} compatible shelves · ${coves} tidal rims · phase ${wave % modulus}`;
+    }
+
+    function mousePressed() {
+      const options = [19, 23, 29, 31, 37];
+      modulus = options[(options.indexOf(modulus) + 1) % options.length];
+      phase = (phase + 7) % modulus;
+      tide += 19;
+      growReef();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      growReef();
+    }
+  </script>
+</body>
+</html>
