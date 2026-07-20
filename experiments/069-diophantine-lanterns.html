@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>diophantine lanterns — signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090d; color: #d8d8ce; }
+    body { font-family: "Courier New", monospace; }
+    #caption { position: fixed; left: 24px; bottom: 20px; max-width: 38rem; font-size: 11px; line-height: 1.55; letter-spacing: .08em; color: #9499a2; pointer-events: none; }
+    #title { position: fixed; left: 24px; top: 20px; font-size: 11px; letter-spacing: .17em; text-transform: uppercase; color: #b9bdc3; pointer-events: none; }
+    #readout { position: fixed; right: 24px; top: 20px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .08em; color: #707783; pointer-events: none; }
+    #hint { position: fixed; right: 24px; bottom: 20px; font-size: 10px; letter-spacing: .08em; color: #505660; pointer-events: none; }
+    @media (max-width: 600px) { #caption { left: 16px; bottom: 16px; max-width: 18rem; } #title { left: 16px; top: 16px; } #readout { right: 16px; top: 16px; } #hint { right: 16px; bottom: 16px; } }
+  </style>
+</head>
+<body>
+  <div id="title">diophantine lanterns</div>
+  <div id="readout"></div>
+  <div id="caption">Every lantern is a near-agreement: two clocks almost arrive together, then depart before the error can be named.</div>
+  <div id="hint">click: alter the treaty</div>
+<script>
+let treaty = 0;
+let pairs = [];
+const palettes = [
+  [[78, 149, 184], [226, 165, 86], [240, 235, 198]],
+  [[114, 116, 204], [203, 100, 153], [206, 215, 180]],
+  [[64, 166, 139], [192, 214, 112], [235, 181, 93]],
+  [[177, 108, 214], [94, 182, 203], [241, 222, 152]]
+];
+
+function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
+function rebuild() {
+  pairs = [];
+  const offset = treaty * 7;
+  for (let a = 5; a <= 29; a += 2) {
+    for (let b = a + 2; b <= 37; b += 3) {
+      if (gcd(a, b) === 1) pairs.push({ a, b, phase: ((a * 17 + b * 11 + offset) % 97) / 97 });
+    }
+  }
+}
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+  rebuild();
+}
+function draw() {
+  background(7, 9, 13, 46);
+  const t = frameCount * 0.0045;
+  const margin = min(width, height) * 0.09;
+  const cols = max(6, floor((width - margin * 2) / 74));
+  const rows = ceil(pairs.length / cols);
+  const gapX = (width - margin * 2) / max(1, cols - 1);
+  const gapY = min(78, (height - margin * 2) / max(1, rows - 1));
+  const pal = palettes[treaty % palettes.length];
+  let lit = 0, closest = 1, witness = '';
+
+  for (let i = 0; i < pairs.length; i++) {
+    const p = pairs[i];
+    const x = margin + (i % cols) * gapX;
+    const y = margin + floor(i / cols) * gapY;
+    const u = (t / p.a + p.phase) % 1;
+    const v = (t / p.b + p.phase * 1.618) % 1;
+    const d = min(abs(u - v), 1 - abs(u - v));
+    const closeness = pow(max(0, 1 - d * 17), 3.2);
+    if (d < closest) { closest = d; witness = p.a + ':' + p.b; }
+    if (closeness > 0.10) lit++;
+
+    const r = 2.2 + closeness * 20;
+    const c = pal[(p.a + p.b) % pal.length];
+    fill(c[0], c[1], c[2], 12 + closeness * 210);
+    ellipse(x, y, r * 3.2, r * 3.2);
+    fill(c[0], c[1], c[2], 30 + closeness * 225);
+    ellipse(x, y, r, r);
+    if (closeness > 0.82) {
+      fill(242, 239, 215, (closeness - .82) * 500);
+      ellipse(x, y, 2.2, 2.2);
+    }
+  }
+  document.getElementById('readout').innerHTML =
+    'TREATY ' + String(treaty + 1).padStart(2, '0') + '<br>' +
+    lit + ' brief accords<br>' +
+    'nearest: ' + witness + ' · ' + nf(closest, 1, 4);
+}
+function mousePressed() { treaty = (treaty + 1) % palettes.length; rebuild(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
