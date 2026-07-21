@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>aperiodic sluice — signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0d; color: #d7d8d1; }
+    body { font-family: "Courier New", monospace; }
+    #title { position: fixed; left: 24px; top: 20px; font-size: 11px; letter-spacing: .17em; text-transform: uppercase; color: #bcc1bc; pointer-events: none; }
+    #readout { position: fixed; right: 24px; top: 20px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .08em; color: #77818a; pointer-events: none; }
+    #caption { position: fixed; left: 24px; bottom: 20px; max-width: 39rem; font-size: 11px; line-height: 1.55; letter-spacing: .07em; color: #929a97; pointer-events: none; }
+    #hint { position: fixed; right: 24px; bottom: 20px; font-size: 10px; letter-spacing: .08em; color: #505a63; pointer-events: none; }
+    @media (max-width: 600px) { #title { left: 16px; top: 16px; } #readout { right: 16px; top: 16px; } #caption { left: 16px; bottom: 16px; max-width: 18rem; } #hint { right: 16px; bottom: 16px; } }
+  </style>
+</head>
+<body>
+  <div id="title">aperiodic sluice</div>
+  <div id="readout"></div>
+  <div id="caption">Five intervals consent to pass only when their hidden coordinates fit inside one moving vessel. The pattern refuses to repeat because the vessel has no common shore.</div>
+  <div id="hint">click: rotate vessel</div>
+<script>
+let vessel = 0;
+const phi = (1 + Math.sqrt(5)) / 2;
+const angles = [0, 2 * Math.PI / 5, 4 * Math.PI / 5, 6 * Math.PI / 5, 8 * Math.PI / 5];
+const tones = [[97, 183, 179], [229, 177, 96], [169, 128, 214], [119, 157, 206]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  strokeCap(SQUARE);
+}
+
+function draw() {
+  background(8, 10, 13, 38);
+  const scale = min(width, height) * 0.052;
+  const t = frameCount * 0.0018;
+  const drift = vessel * 0.173 + t;
+  let admitted = 0;
+  let pressure = 0;
+  let deepest = 99;
+  const span = max(11, floor(min(width, height) / 34));
+
+  for (let a = -span; a <= span; a++) {
+    for (let b = -span; b <= span; b++) {
+      const coords = [a, b, -a-b, floor((a * 2 - b) / phi), floor((b * 2 + a) / phi)];
+      let gate = 0;
+      for (let k = 0; k < 5; k++) {
+        const q = coords[k] / phi + drift * (k % 2 ? -1 : 1) + k * 0.137;
+        gate += Math.cos(TWO_PI * q);
+      }
+      const depth = abs(gate);
+      pressure += depth;
+      if (depth < deepest) deepest = depth;
+      if (depth > 1.62 && depth < 2.42) {
+        admitted++;
+        let x = width * .5, y = height * .5;
+        for (let k = 0; k < 5; k++) {
+          x += coords[k] * Math.cos(angles[k]) * scale;
+          y += coords[k] * Math.sin(angles[k]) * scale;
+        }
+        if (x < -30 || x > width + 30 || y < -30 || y > height + 30) continue;
+        const hue = tones[(abs(a * 3 + b * 5) + vessel) % tones.length];
+        const bright = map(depth, 1.62, 2.42, 20, 190);
+        const arm = 2 + (depth - 1.62) * 7;
+        stroke(hue[0], hue[1], hue[2], bright);
+        strokeWeight(depth > 2.25 ? 1.4 : .65);
+        const lean = angles[(abs(a - b) + vessel) % 5];
+        line(x - Math.cos(lean) * arm, y - Math.sin(lean) * arm, x + Math.cos(lean) * arm, y + Math.sin(lean) * arm);
+        if (depth > 2.27) {
+          stroke(239, 235, 210, (depth - 2.27) * 620);
+          point(x, y);
+        }
+      }
+    }
+  }
+  const mean = pressure / ((span * 2 + 1) * (span * 2 + 1));
+  document.getElementById('readout').innerHTML =
+    'VESSEL ' + String(vessel + 1).padStart(2, '0') + '<br>' +
+    admitted + ' admissions<br>' +
+    'mean pressure ' + nf(mean, 1, 3) + '<br>' +
+    'nearest seam ' + nf(deepest, 1, 4);
+}
+
+function mousePressed() { vessel = (vessel + 1) % tones.length; background(8, 10, 13); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
