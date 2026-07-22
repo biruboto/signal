@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>beatty spillway — signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0c; color: #d7d9d1; }
+    body { font-family: "Courier New", monospace; }
+    #title { position: fixed; left: 24px; top: 20px; font-size: 11px; letter-spacing: .17em; text-transform: uppercase; color: #c4c8be; pointer-events: none; }
+    #readout { position: fixed; right: 24px; top: 20px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .08em; color: #77818a; pointer-events: none; }
+    #caption { position: fixed; left: 24px; bottom: 20px; max-width: 42rem; font-size: 11px; line-height: 1.55; letter-spacing: .065em; color: #929a97; pointer-events: none; }
+    #hint { position: fixed; right: 24px; bottom: 20px; font-size: 10px; letter-spacing: .08em; color: #505a63; pointer-events: none; }
+    @media (max-width: 600px) { #title { left: 16px; top: 16px; } #readout { right: 16px; top: 16px; } #caption { left: 16px; bottom: 16px; max-width: 18rem; } #hint { right: 16px; bottom: 16px; } }
+  </style>
+</head>
+<body>
+  <div id="title">beatty spillway</div>
+  <div id="readout"></div>
+  <div id="caption">Two irrational clerks allocate every whole number without overlap. Their receipts arrive as unequal steps; the spillway records where the schedules almost touch.</div>
+  <div id="hint">click: shift the ledger</div>
+<script>
+let ledger = 0;
+const phi = (1 + Math.sqrt(5)) / 2;
+const silver = 1 + Math.sqrt(2);
+const palettes = [
+  [[83, 185, 181], [225, 171, 89]],
+  [[142, 130, 214], [111, 174, 204]],
+  [[190, 116, 133], [190, 188, 108]],
+  [[108, 170, 128], [213, 144, 101]]
+];
+
+function schedule(n, ratio, phase) {
+  return Math.floor((n + phase) * ratio) - Math.floor(phase * ratio);
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  strokeCap(SQUARE);
+}
+
+function draw() {
+  background(8, 10, 12, 50);
+  const t = frameCount * 0.0023;
+  const phase = ledger * 0.137 + t;
+  const pair = palettes[ledger % palettes.length];
+  const centerY = height * 0.51;
+  const left = 42;
+  const right = width - 42;
+  const count = Math.max(48, Math.min(190, Math.floor(width / 8)));
+  const step = (right - left) / count;
+  let near = 0;
+  let totalGap = 0;
+  let longest = 0;
+  let run = 0;
+
+  stroke(61, 70, 75, 90);
+  strokeWeight(1);
+  line(left, centerY, right, centerY);
+
+  for (let n = 1; n <= count; n++) {
+    const a = schedule(n, phi, phase);
+    const b = schedule(n, silver, -phase * 0.73);
+    const prevA = schedule(n - 1, phi, phase);
+    const prevB = schedule(n - 1, silver, -phase * 0.73);
+    const da = a - prevA;
+    const db = b - prevB;
+    const gap = Math.abs(a / phi - b / silver);
+    const x = left + n * step;
+    const drift = (a - b) * 3.7;
+    const yA = centerY - 34 - drift;
+    const yB = centerY + 34 - drift;
+    const agreement = da === db;
+    totalGap += gap;
+
+    if (gap < 0.18) {
+      near++;
+      run++;
+      longest = Math.max(longest, run);
+    } else run = 0;
+
+    const pulse = 0.5 + 0.5 * Math.sin(n * 0.73 + t * 4 + ledger);
+    stroke(pair[0][0], pair[0][1], pair[0][2], agreement ? 155 : 62);
+    strokeWeight(agreement ? 1.35 : 0.65);
+    line(x, centerY, x, yA);
+    stroke(pair[1][0], pair[1][1], pair[1][2], agreement ? 155 : 62);
+    line(x + step * 0.28, centerY, x + step * 0.28, yB);
+
+    if (gap < 0.18) {
+      const r = 1.5 + (0.18 - gap) * 20 + pulse;
+      noStroke();
+      fill(238, 233, 207, 110 + pulse * 100);
+      circle(x + step * 0.14, centerY - drift, r * 2);
+      stroke(238, 233, 207, 48);
+      line(x, yA, x + step * 0.28, yB);
+    }
+  }
+
+  document.getElementById('readout').innerHTML =
+    'LEDGER ' + String(ledger + 1).padStart(2, '0') + '<br>' +
+    count + ' paired intervals<br>' +
+    near + ' near receipts<br>' +
+    'longest spill ' + longest + '<br>' +
+    'mean divergence ' + (totalGap / count).toFixed(3);
+}
+
+function mousePressed() {
+  ledger = (ledger + 1) % palettes.length;
+  background(8, 10, 12);
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
