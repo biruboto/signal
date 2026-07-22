@@ -23,6 +23,24 @@ body {
   margin: 0 auto;
 }
 
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 1;
+  padding: 0.6rem 0.8rem;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.75rem;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 120ms ease-out;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 header {
   padding: 4rem 0;
   border-bottom: 1px solid var(--dim);
