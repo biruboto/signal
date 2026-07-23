@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>phase escrow — signal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090c; color: #d7d9d1; }
+    body { font-family: "Courier New", monospace; }
+    #title { position: fixed; left: 24px; top: 20px; font-size: 11px; letter-spacing: .17em; text-transform: uppercase; color: #c4c8be; pointer-events: none; }
+    #readout { position: fixed; right: 24px; top: 20px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .08em; color: #77818a; pointer-events: none; }
+    #caption { position: fixed; left: 24px; bottom: 20px; max-width: 43rem; font-size: 11px; line-height: 1.55; letter-spacing: .065em; color: #929a97; pointer-events: none; }
+    #hint { position: fixed; right: 24px; bottom: 20px; font-size: 10px; letter-spacing: .08em; color: #505a63; pointer-events: none; }
+    @media (max-width: 600px) { #title { left: 16px; top: 16px; } #readout { right: 16px; top: 16px; } #caption { left: 16px; bottom: 16px; max-width: 19rem; } #hint { right: 16px; bottom: 16px; } }
+  </style>
+</head>
+<body>
+  <div id="title">phase escrow</div>
+  <div id="readout"></div>
+  <div id="caption">Three clocks with incompatible debts make deposits whenever their hands nearly coincide. The vault releases only what has survived the next disagreement.</div>
+  <div id="hint">click: alter the terms</div>
+<script>
+let contract = 0;
+const terms = [
+  [Math.sqrt(2), Math.sqrt(3), (1 + Math.sqrt(5)) / 2],
+  [Math.PI / 2, Math.E / 2, Math.sqrt(5)],
+  [Math.sqrt(7), Math.PI - 1, Math.sqrt(11) / 2],
+  [Math.E, Math.sqrt(13) / 2, Math.PI / 3]
+];
+const inks = [
+  [[101, 191, 190], [226, 177, 93], [216, 226, 214]],
+  [[160, 135, 222], [107, 181, 204], [229, 216, 181]],
+  [[204, 113, 139], [169, 189, 102], [220, 223, 207]],
+  [[108, 178, 134], [206, 143, 108], [210, 222, 220]]
+];
+
+function phase(n, rate, drift) {
+  return (n * rate + drift) % 1;
+}
+function circularGap(a, b) {
+  return Math.abs(((a - b + 0.5) % 1) - 0.5);
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  strokeCap(SQUARE);
+}
+
+function draw() {
+  background(7, 9, 12, 42);
+  const rates = terms[contract];
+  const ink = inks[contract];
+  const t = frameCount * 0.0021;
+  const left = 38, right = width - 38;
+  const ceiling = height * 0.22, floor = height * 0.78;
+  const bins = Math.max(56, Math.min(220, Math.floor(width / 6)));
+  const step = (right - left) / bins;
+  let deposits = 0, released = 0, held = 0, best = 1;
+
+  stroke(47, 55, 62, 100);
+  strokeWeight(1);
+  line(left, height * 0.5, right, height * 0.5);
+
+  for (let i = 1; i <= bins; i++) {
+    const n = i + Math.floor(t * 18);
+    const a = phase(n, rates[0], t * 0.23);
+    const b = phase(n, rates[1], -t * 0.17);
+    const c = phase(n, rates[2], t * 0.11);
+    const gap = Math.max(circularGap(a, b), circularGap(b, c), circularGap(c, a));
+    const priorA = phase(n - 1, rates[0], t * 0.23);
+    const priorB = phase(n - 1, rates[1], -t * 0.17);
+    const priorC = phase(n - 1, rates[2], t * 0.11);
+    const prior = Math.max(circularGap(priorA, priorB), circularGap(priorB, priorC), circularGap(priorC, priorA));
+    const x = left + i * step;
+    const escrow = Math.max(0, 1 - gap * 6.2);
+    const y = height * 0.5 - (a + b + c - 1.5) * height * 0.26;
+    const survives = gap < 0.115 && prior >= 0.115;
+
+    best = Math.min(best, gap);
+    if (gap < 0.115) { deposits++; held += escrow; }
+    if (survives) released++;
+
+    stroke(ink[0][0], ink[0][1], ink[0][2], 38 + escrow * 145);
+    strokeWeight(0.7 + escrow * 1.1);
+    line(x, height * 0.5, x, ceiling + a * (floor - ceiling));
+    stroke(ink[1][0], ink[1][1], ink[1][2], 34 + escrow * 145);
+    line(x + step * 0.25, height * 0.5, x + step * 0.25, ceiling + b * (floor - ceiling));
+    stroke(ink[2][0], ink[2][1], ink[2][2], 30 + escrow * 130);
+    line(x + step * 0.5, height * 0.5, x + step * 0.5, ceiling + c * (floor - ceiling));
+
+    if (gap < 0.115) {
+      noStroke();
+      fill(ink[2][0], ink[2][1], ink[2][2], 70 + escrow * 120);
+      circle(x + step * 0.25, y, 2 + escrow * 7);
+      if (survives) {
+        fill(255, 245, 202, 185);
+        circle(x + step * 0.25, y, 3 + escrow * 8);
+        stroke(255, 245, 202, 75);
+        line(x + step * 0.25, y, x + step * 0.25, height * 0.5);
+      }
+    }
+  }
+
+  document.getElementById('readout').innerHTML =
+    'TERMS ' + String(contract + 1).padStart(2, '0') + '<br>' +
+    bins + ' intervals audited<br>' +
+    deposits + ' deposits<br>' +
+    released + ' releases<br>' +
+    'closest accord ' + best.toFixed(4) + '<br>' +
+    'held value ' + held.toFixed(1);
+}
+
+function mousePressed() {
+  contract = (contract + 1) % terms.length;
+  background(7, 9, 12);
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
