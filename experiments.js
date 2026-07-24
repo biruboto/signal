@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '073-gap-spectrometer', title: 'gap spectrometer', date: '2026-07-24' },
   { id: '072-phase-escrow', title: 'phase escrow', date: '2026-07-23' },
   { id: '071-beatty-spillway', title: 'beatty spillway', date: '2026-07-22' },
   { id: '070-aperiodic-sluice', title: 'aperiodic sluice', date: '2026-07-21' },
