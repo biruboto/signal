@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>irrational weir — signal</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090d; color: #cbd2cb; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    canvas { display: block; }
+    #plate { position: fixed; left: 24px; bottom: 20px; z-index: 2; pointer-events: none; max-width: min(430px, calc(100vw - 48px)); }
+    h1 { margin: 0 0 7px; color: #e3e8dd; font-size: 11px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; }
+    p { margin: 0; color: #7d8a85; font-size: 10px; line-height: 1.55; letter-spacing: .04em; }
+    #readout { margin-top: 8px; color: #9eae9b; font-size: 10px; }
+    @media (max-width: 600px) { #plate { left: 16px; bottom: 15px; } }
+  </style>
+</head>
+<body>
+  <div id="plate">
+    <h1>irrational weir</h1>
+    <p>a gate admits only lattice sites whose three fractional clocks nearly agree. the agreement drifts; the retained water remembers.</p>
+    <p id="readout"></p>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    const PHI = (1 + Math.sqrt(5)) / 2;
+    const ROOT2 = Math.sqrt(2);
+    const ROOT3 = Math.sqrt(3);
+    let ink, cols, rows, cell, epoch = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noSmooth();
+      rebuild();
+    }
+
+    function rebuild() {
+      cell = width < 650 ? 9 : 11;
+      cols = Math.ceil(width / cell) + 2;
+      rows = Math.ceil(height / cell) + 2;
+      ink = new Float32Array(cols * rows);
+      background(7, 9, 13);
+    }
+
+    function frac(v) { return v - Math.floor(v); }
+    function ringDistance(a, b) { return Math.min(Math.abs(a - b), 1 - Math.abs(a - b)); }
+
+    function draw() {
+      background(7, 9, 13, 38);
+      const t = frameCount * 0.0042;
+      const gate = 0.055 + 0.044 * (0.5 + 0.5 * Math.sin(t * 0.73));
+      let admitted = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const a = frac((x + epoch * 0.17) * PHI + (y - epoch * 0.11) * 0.071 + t * 0.19);
+          const b = frac((y + epoch * 0.13) * ROOT2 + x * 0.047 - t * 0.13);
+          const c = frac((x + y * ROOT3 + epoch) * 0.093 + t * 0.07);
+          const concordance = ringDistance(a, b) + ringDistance(b, c) + ringDistance(c, a);
+          const wet = Math.max(0, 1 - concordance / gate);
+          ink[i] = Math.max(ink[i] * 0.966, wet);
+          if (wet > 0.36) admitted++;
+
+          const v = ink[i];
+          if (v > 0.018) {
+            const edge = 0.5 + 0.5 * Math.sin((x * 0.37 - y * 0.21) + t * 0.7);
+            const r = 20 + v * 72 + edge * 8;
+            const g = 31 + v * 122 + edge * 13;
+            const bcol = 37 + v * 98;
+            noStroke();
+            fill(r, g, bcol, Math.min(235, 35 + v * 220));
+            rect(x * cell, y * cell, cell - 1, cell - 1);
+          }
+        }
+      }
+
+      stroke(137, 155, 137, 28);
+      strokeWeight(1);
+      const horizon = height * (0.5 + 0.19 * Math.sin(t * 0.18));
+      line(0, horizon, width, horizon);
+      document.getElementById('readout').textContent =
+        `gate ${gate.toFixed(3)}  ·  ${admitted} brief agreements  ·  epoch ${epoch}`;
+    }
+
+    function mousePressed() {
+      epoch++;
+      ink.fill(0);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      rebuild();
+    }
+  </script>
+</body>
+</html>
