@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '075-alias-ossuary', title: 'alias ossuary', date: '2026-07-27' },
   { id: '074-irrational-weir', title: 'irrational weir', date: '2026-07-26' },
   { id: '073-gap-spectrometer', title: 'gap spectrometer', date: '2026-07-24' },
   { id: '072-phase-escrow', title: 'phase escrow', date: '2026-07-23' },

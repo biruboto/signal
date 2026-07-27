@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>alias ossuary</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;overflow:hidden;background:#07090c;color:#c7d2ca}
+  canvas{display:block} #caption{position:fixed;left:24px;bottom:20px;font:11px/1.4 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;text-transform:uppercase;color:#9eaaa1;pointer-events:none}
+  #readout{position:fixed;right:24px;top:20px;text-align:right;font:10px/1.5 ui-monospace,SFMono-Regular,monospace;letter-spacing:.1em;color:#718078;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="readout"></div><div id="caption">alias ossuary · a ring remembers only its collisions · click to alter the teeth</div>
+<script>
+let cells=[], nextCells=[], teeth=233, generation=0, scale=10, ink;
+const readout=document.getElementById('readout');
+function seed(){
+  teeth=Math.max(89, Math.floor(width/scale));
+  cells=Array.from({length:teeth},(_,i)=> ((i*i+3*i+17)%29===0 || i%47===0) ? 1 : 0);
+  generation=0;
+}
+function setup(){ createCanvas(windowWidth,windowHeight); pixelDensity(1); ink=color(157,205,175); seed(); background(7,9,12); }
+function draw(){
+  background(7,9,12,32);
+  const rows=Math.ceil(height/scale), y0=height-rows*scale;
+  noStroke();
+  for(let r=0;r<rows;r++){
+    let age=generation-r;
+    if(age<0) continue;
+    let row=historyAt(age);
+    for(let x=0;x<teeth;x++) if(row[x]){
+      const parity=(x+age)%7;
+      fill(95+parity*12,145+parity*8,117+parity*9, 40+Math.min(175,r*3));
+      rect(x*scale,y0+r*scale,scale-1,scale-1);
+    }
+  }
+  step(); generation++;
+  const mass=cells.reduce((a,b)=>a+b,0);
+  readout.textContent=`TEETH ${teeth}\nGENERATION ${generation}\nREMAINS ${mass}\nRULE 90 ⊕ 150`;
+}
+// Reconstructing each visible stratum from its deterministic seed makes the present a cross-section, not a scrollback buffer.
+function historyAt(target){
+  let a=Array.from({length:teeth},(_,i)=> ((i*i+3*i+17)%29===0 || i%47===0) ? 1 : 0);
+  for(let g=0;g<target;g++){
+    let b=new Array(teeth);
+    for(let i=0;i<teeth;i++){
+      const l=a[(i-1+teeth)%teeth], c=a[i], r=a[(i+1)%teeth];
+      b[i]= (i%5===0) ? (l^c^r) : (l^r);
+    } a=b;
+  } return a;
+}
+function step(){
+  nextCells=new Array(teeth);
+  for(let i=0;i<teeth;i++){
+    const l=cells[(i-1+teeth)%teeth],c=cells[i],r=cells[(i+1)%teeth];
+    nextCells[i]=(i%5===0)?(l^c^r):(l^r);
+  } cells=nextCells;
+}
+function mousePressed(){
+  const i=Math.floor(mouseX/scale); if(i>=0&&i<teeth) cells[i]^=1;
+}
+function windowResized(){ resizeCanvas(windowWidth,windowHeight); seed(); background(7,9,12); }
+</script>
+</body>
+</html>
