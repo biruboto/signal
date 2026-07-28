@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>scarcity choir</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #090b10; color: #d5d8d3; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #note { position: fixed; left: 20px; bottom: 18px; max-width: min(590px, calc(100vw - 40px)); font-size: 11px; line-height: 1.55; letter-spacing: .04em; color: rgba(213,216,211,.66); pointer-events: none; }
+    #note b { color: #e2a875; font-weight: 500; }
+    #seed { position: fixed; right: 20px; top: 18px; font-size: 10px; letter-spacing: .12em; color: rgba(213,216,211,.42); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="seed"></div>
+  <div id="note"><b>scarcity choir</b> — each voice may sing only when its private clock is furthest from all the others. Click to reseed the clocks.</div>
+<script>
+let voices = [], stamp = 0, seed = 1;
+const palette = ['#e2a875', '#a5c8bd', '#9b9fcf', '#d27c8a', '#d6c86e'];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  resetChoir();
+}
+
+function resetChoir() {
+  seed = floor(random(10000, 99999));
+  randomSeed(seed);
+  noiseSeed(seed);
+  const count = constrain(floor(width / 95), 7, 15);
+  voices = Array.from({ length: count }, (_, i) => ({
+    period: random(4.7, 16.9) * (i % 2 ? 1 : 1.618),
+    phase: random(TWO_PI),
+    hue: palette[i % palette.length],
+    history: [],
+    charge: 0
+  }));
+  stamp = millis();
+  document.getElementById('seed').textContent = 'clock cluster ' + seed;
+}
+
+function draw() {
+  background('#090b10');
+  const t = (millis() - stamp) / 1000;
+  const left = 34, right = width - 34, top = 55, bottom = height - 75;
+  const band = (bottom - top) / voices.length;
+
+  for (let i = 0; i < voices.length; i++) {
+    const v = voices[i];
+    const own = sin(t / v.period + v.phase);
+    let nearest = 9;
+    for (let j = 0; j < voices.length; j++) {
+      if (i === j) continue;
+      const u = voices[j];
+      const other = sin(t / u.period + u.phase);
+      nearest = min(nearest, abs(own - other));
+    }
+    // Isolation, not amplitude, grants a voice its brief permission.
+    const permission = pow(constrain((nearest - .16) / .68, 0, 1), 2.4);
+    v.charge = lerp(v.charge, permission, .07);
+    v.history.push(v.charge);
+    if (v.history.length > 180) v.history.shift();
+
+    const y = top + band * (i + .5);
+    stroke(255, 255, 255, 10); strokeWeight(1); line(left, y, right, y);
+    noFill();
+    beginShape();
+    for (let k = 0; k < v.history.length; k++) {
+      const x = map(k, 0, 179, left, right);
+      const h = v.history[k] * band * .68;
+      stroke(v.hue); strokeWeight(1.2 + v.history[k] * 2.2);
+      vertex(x, y - h);
+    }
+    endShape();
+
+    const xNow = right;
+    const hNow = v.charge * band * .68;
+    noStroke(); fill(v.hue + '33'); ellipse(xNow, y - hNow, 12 + v.charge * 36);
+    fill(v.hue); ellipse(xNow, y - hNow, 2 + v.charge * 5);
+    fill(213,216,211,110); textSize(9); textAlign(LEFT, CENTER);
+    text(String(i + 1).padStart(2, '0') + '  ' + nf(v.period, 1, 2), left, y + 13);
+  }
+
+  noStroke(); fill(213,216,211,105); textSize(10); textAlign(LEFT, BASELINE);
+  text('the record of permissions  →', left, 28);
+  textAlign(RIGHT, BASELINE); text('isolation is the instrument', right, 28);
+}
+
+function mousePressed() { resetChoir(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); resetChoir(); }
+</script>
+</body>
+</html>
