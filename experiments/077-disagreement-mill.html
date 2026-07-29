@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>disagreement mill</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #080a0d; color: #d9dfd5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  canvas { display: block; }
+  #caption { position: fixed; left: 18px; bottom: 16px; max-width: 500px; font-size: 11px; line-height: 1.5; letter-spacing: .055em; color: rgba(218,225,210,.7); pointer-events: none; }
+  #caption b { color: #e9a85d; font-weight: normal; }
+  #meter { position: fixed; right: 18px; top: 16px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .1em; color: rgba(218,225,210,.62); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="meter"></div>
+<div id="caption"><b>DISAGREEMENT MILL</b><br>three irrational clocks mill the same residue field. only pixels without a majority are allowed to glow.<br><span id="note">click to change the grain.</span></div>
+<script>
+let grain = 1, paused = false;
+const meter = document.getElementById('meter');
+const note = document.getElementById('note');
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+}
+
+function draw() {
+  if (paused) return;
+  background(8, 10, 13);
+  const t = frameCount * 0.008;
+  const cell = constrain(floor(min(width, height) / 42), 9, 19);
+  const cols = ceil(width / cell), rows = ceil(height / cell);
+  let unsettled = 0;
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      // Three ways of rounding the same wandering coordinate.
+      const a = floor((x * 0.61803398875 + y * 0.41421356237 + t * 1.7 + grain) % 7);
+      const b = floor((x * 0.75487766625 - y * 0.73205080757 - t * 1.31 + grain * 3) % 7 + 7) % 7;
+      const c = floor((x * 0.56984029099 + y * 0.83928675521 + t * 0.91 + grain * 5) % 7);
+      const distinct = (a !== b ? 1 : 0) + (b !== c ? 1 : 0) + (c !== a ? 1 : 0);
+      if (distinct === 2) {
+        unsettled++;
+        const pulse = 0.42 + 0.58 * sin(t * 4 + x * .31 - y * .23);
+        const hue = (a * 43 + b * 17 + c * 29 + grain * 13) % 255;
+        const r = 80 + hue * .42;
+        const g = 126 + (255 - hue) * .24;
+        const bl = 92 + hue * .19;
+        fill(r * pulse, g * pulse, bl * pulse, 210);
+        rect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+      } else if ((x + y + grain) % 13 === 0) {
+        fill(35, 43, 48, 110);
+        rect(x * cell + cell * .42, y * cell + cell * .42, 1, 1);
+      }
+    }
+  }
+  const total = cols * rows;
+  meter.innerHTML = `GRAIN ${String(grain).padStart(4, '0')}<br>UNSETTLED ${nf(100 * unsettled / total, 2, 1)}%<br>THREE CLOCKS / NO VOTE`;
+}
+
+function mousePressed() {
+  grain = floor(random(1, 9999));
+  paused = false;
+  loop();
+  note.textContent = 'new grain admitted.';
+}
+function keyPressed() {
+  if (key === ' ') {
+    paused = !paused;
+    paused ? noLoop() : loop();
+    note.textContent = paused ? 'the mill holds its disagreement.' : 'the mill resumes.';
+  }
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>

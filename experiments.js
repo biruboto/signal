@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '077-disagreement-mill', title: 'disagreement mill', date: '2026-07-29' },
   { id: '076-scarcity-choir', title: 'scarcity choir', date: '2026-07-28' },
   { id: '075-alias-ossuary', title: 'alias ossuary', date: '2026-07-27' },
   { id: '074-irrational-weir', title: 'irrational weir', date: '2026-07-26' },
