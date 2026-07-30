@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>witness shoal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07100f; color: #d8e7d8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 22px; bottom: 19px; max-width: 440px; font-size: 11px; line-height: 1.55; letter-spacing: .045em; color: rgba(216,231,216,.68); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 18px; text-align: right; font-size: 10px; line-height: 1.55; letter-spacing: .09em; color: rgba(216,231,216,.54); pointer-events: none; }
+    #title { position: fixed; left: 22px; top: 18px; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: rgba(216,231,216,.8); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="title">witness shoal</div>
+  <div id="readout"></div>
+  <div id="caption">Each mote carries three incompatible answers to the same question. Only the rare agreements are allowed to glow. Click to change the question.</div>
+<script>
+let tick = 0;
+let variant = 0;
+let readout;
+const questions = [
+  [7, 11, 13], [8, 13, 17], [9, 14, 19], [11, 16, 23], [12, 17, 29]
+];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  readout = document.getElementById('readout');
+  background(7, 16, 15);
+}
+
+function hash(n) {
+  n = (n ^ 61) ^ (n >>> 16);
+  n = n + (n << 3);
+  n = n ^ (n >>> 4);
+  n = Math.imul(n, 0x27d4eb2d);
+  return (n ^ (n >>> 15)) >>> 0;
+}
+
+function draw() {
+  const q = questions[variant];
+  const t = tick++;
+  noStroke();
+  fill(7, 16, 15, 29);
+  rect(0, 0, width, height);
+
+  const spacing = max(20, min(38, width / 38));
+  const cols = ceil(width / spacing) + 2;
+  const rows = ceil(height / spacing) + 2;
+  let accords = 0;
+  let disputes = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const id = r * cols + c;
+      const h = hash(id + t * 3);
+      const drift = (h % 1000) / 1000;
+      const a = (id + floor(t / q[0])) % q[0];
+      const b = (id * 3 + floor(t / q[1])) % q[1];
+      const d = (id * 5 + floor(t / q[2])) % q[2];
+      const witnesses = (a === 0 ? 1 : 0) + (b === 0 ? 1 : 0) + (d === 0 ? 1 : 0);
+      const x = (c - .5) * spacing + sin(t * .012 + r * .71) * spacing * .35;
+      const y = (r - .5) * spacing + cos(t * .01 + c * .53) * spacing * .35;
+      const size = 1.5 + drift * 2.8 + witnesses * 1.5;
+
+      if (witnesses >= 2) {
+        accords++;
+        fill(143, 224, 175, 120 + 35 * sin(t * .08 + id));
+        circle(x, y, size * 2.6);
+        fill(208, 255, 215, 205);
+        circle(x, y, size * .72);
+      } else if (witnesses === 1) {
+        disputes++;
+        fill(53, 130, 109, 74);
+        circle(x, y, size);
+      } else {
+        fill(35, 69, 62, 48);
+        circle(x, y, size * .55);
+      }
+    }
+  }
+
+  if (frameCount % 12 === 0) {
+    readout.innerHTML = `question: mod ${q.join(' / mod ')}<br>accords: ${accords.toString().padStart(3, '0')}<br>single witnesses: ${disputes.toString().padStart(4, '0')}`;
+  }
+}
+
+function mousePressed() {
+  variant = (variant + 1) % questions.length;
+  background(7, 16, 15);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  background(7, 16, 15);
+}
+</script>
+</body>
+</html>
