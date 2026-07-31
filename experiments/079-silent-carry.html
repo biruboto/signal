@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>silent carry</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #090b13; color: #d8d9e8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #title { position: fixed; left: 22px; top: 18px; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: rgba(220,224,245,.84); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 18px; text-align: right; font-size: 10px; line-height: 1.6; letter-spacing: .08em; color: rgba(193,202,236,.58); pointer-events: none; }
+    #caption { position: fixed; left: 22px; bottom: 18px; max-width: 480px; font-size: 11px; line-height: 1.55; letter-spacing: .035em; color: rgba(206,209,232,.67); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="title">silent carry</div>
+  <div id="readout"></div>
+  <div id="caption">Two counting fields meet at an oblique border. Most collisions make a carry and vanish. The uncarried sums accumulate as a temporary coastline. Click to change the radix.</div>
+<script>
+let tick = 0;
+let mode = 0;
+let readout;
+const radices = [5, 7, 9, 11, 13];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  readout = document.getElementById('readout');
+  background(9, 11, 19);
+}
+
+function digitSum(n, base) {
+  let sum = 0;
+  while (n > 0) { sum += n % base; n = floor(n / base); }
+  return sum;
+}
+
+function carryless(a, b, base) {
+  let carries = 0;
+  while (a > 0 || b > 0) {
+    if ((a % base) + (b % base) >= base) carries++;
+    a = floor(a / base);
+    b = floor(b / base);
+  }
+  return carries;
+}
+
+function draw() {
+  const base = radices[mode];
+  const t = tick++;
+  const gap = max(13, min(24, width / 68));
+  const cols = ceil(width / gap) + 3;
+  const rows = ceil(height / gap) + 3;
+  const slant = sin(t * .004) * 8;
+  let quiet = 0;
+  let debt = 0;
+
+  noStroke();
+  fill(9, 11, 19, 33);
+  rect(0, 0, width, height);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = (c - .5) * gap;
+      const y = (r - .5) * gap;
+      const boundary = cols * .48 + r * .19 + slant;
+      const left = c < boundary;
+      const a = left ? c + floor(t / 17) : r * 3 + floor(t / 23);
+      const b = left ? r * 2 + floor(t / 29) : c + floor(t / 19);
+      const carries = carryless(a, b, base);
+      const residue = (digitSum(a, base) + digitSum(b, base)) % base;
+      const ripple = sin(t * .035 + c * .77 - r * .46);
+
+      if (carries === 0) {
+        quiet++;
+        const bloom = 1.3 + residue * .23 + ripple * .25;
+        fill(112 + residue * 8, 174 + residue * 5, 231, 84 + residue * 12);
+        circle(x, y, gap * bloom * .33);
+        fill(227, 239, 255, 115 + residue * 12);
+        circle(x, y, max(1.2, gap * .085));
+        if (abs(c - boundary) < 1.7) {
+          fill(255, 188, 111, 160);
+          circle(x, y, gap * .17);
+        }
+      } else {
+        debt += carries;
+        const dim = 20 + carries * 13;
+        fill(39 + residue * 3, 45 + residue * 3, 70 + residue * 5, dim);
+        rect(x - .7, y - .7, 1.4, 1.4);
+      }
+    }
+  }
+
+  stroke(117, 142, 202, 38);
+  strokeWeight(1);
+  for (let r = -2; r < rows + 2; r += 4) {
+    const x1 = (cols * .48 + r * .19 + slant) * gap;
+    line(x1, r * gap, x1 + gap * .76, (r + 4) * gap);
+  }
+
+  if (frameCount % 12 === 0) {
+    readout.innerHTML = `radix: ${base}<br>uncarried sites: ${quiet.toString().padStart(4, '0')}<br>suppressed carries: ${debt.toString().padStart(4, '0')}`;
+  }
+}
+
+function mousePressed() {
+  mode = (mode + 1) % radices.length;
+  background(9, 11, 19);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  background(9, 11, 19);
+}
+</script>
+</body>
+</html>
