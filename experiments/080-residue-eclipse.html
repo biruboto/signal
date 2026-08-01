@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>residue eclipse</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080b10; color: #dce5e7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display:block; }
+    #title { position:fixed; left:22px; top:18px; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:rgba(224,239,236,.86); pointer-events:none; }
+    #readout { position:fixed; right:22px; top:18px; text-align:right; font-size:10px; line-height:1.6; letter-spacing:.08em; color:rgba(189,220,215,.62); pointer-events:none; }
+    #caption { position:fixed; left:22px; bottom:18px; max-width:520px; font-size:11px; line-height:1.55; letter-spacing:.035em; color:rgba(207,222,219,.68); pointer-events:none; }
+  </style>
+</head>
+<body>
+  <div id="title">residue eclipse</div>
+  <div id="readout"></div>
+  <div id="caption">Two clocks cast their remainders onto the same field. Where their shadows agree, light is withheld. Click to replace one clock; the eclipse is never quite the same twice.</div>
+<script>
+let phase = 0;
+let pulse = 0;
+let readout;
+const pairs = [[7,11],[8,13],[9,14],[11,17],[13,19]];
+function setup() { createCanvas(windowWidth, windowHeight); pixelDensity(1); readout = document.getElementById('readout'); }
+function draw() {
+  const [a,b] = pairs[phase];
+  pulse += 0.012;
+  const gap = max(12, min(23, width / 70));
+  const cols = ceil(width/gap)+2, rows = ceil(height/gap)+2;
+  let lit=0, eclipsed=0, rare=0;
+  noStroke(); fill(8,11,16,28); rect(0,0,width,height);
+  for (let y=0; y<rows; y++) for (let x=0; x<cols; x++) {
+    const n = x*17 + y*31 + floor(pulse*9);
+    const ra = (n*n + 3*x + y) % a;
+    const rb = (n*n + 3*x + y) % b;
+    const same = ra === rb;
+    const near = abs(ra-rb) === 1 || abs(ra-rb) === min(a,b)-1;
+    const wave = sin(pulse + x*.22 - y*.17);
+    const px=x*gap, py=y*gap;
+    if (same) {
+      eclipsed++;
+      fill(18,24,29,105); circle(px,py,gap*(.28+abs(wave)*.16));
+      fill(181,232,213,150); circle(px,py,gap*.055);
+    } else if (near) {
+      lit++;
+      fill(222,177+ra*3,112+rb*4,125); circle(px,py,gap*(.10+abs(wave)*.07));
+    } else {
+      rare += (ra===0 && rb===0) ? 1 : 0;
+      fill(49+ra*9,88+rb*5,104+ra*4,80); circle(px,py,gap*(.16+((ra+rb)%4)*.035));
+    }
+  }
+  stroke(160,218,204,26); strokeWeight(1);
+  for (let y=0; y<height; y+=gap*7) line(0,y+sin(pulse+y*.01)*4,width,y+sin(pulse+y*.01)*4);
+  if (frameCount % 10 === 0) readout.innerHTML = `clocks: ${a} × ${b}<br>eclipsed residues: ${String(eclipsed).padStart(4,'0')}<br>near alignments: ${String(lit).padStart(4,'0')}<br>double zeroes: ${String(rare).padStart(3,'0')}`;
+}
+function mousePressed() { phase=(phase+1)%pairs.length; background(8,11,16); }
+function windowResized() { resizeCanvas(windowWidth,windowHeight); background(8,11,16); }
+</script>
+</body>
+</html>
