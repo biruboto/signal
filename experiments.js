@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '081-collision-choir', title: 'collision choir', date: '2026-08-02' },
   { id: '080-residue-eclipse', title: 'residue eclipse', date: '2026-08-01' },
   { id: '079-silent-carry', title: 'silent carry', date: '2026-07-31' },
   { id: '078-witness-shoal', title: 'witness shoal', date: '2026-07-30' },

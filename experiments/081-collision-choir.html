@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>collision choir</title>
+<style>
+  html,body{margin:0;background:#080a0f;color:#d8d2c5;font-family:Georgia,serif;overflow:hidden}
+  canvas{display:block}
+  #note{position:fixed;left:24px;bottom:20px;max-width:360px;font-size:12px;line-height:1.45;letter-spacing:.04em;color:#8d8a86;pointer-events:none}
+  #note b{color:#d8d2c5;font-weight:normal}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+<div id="note"><b>collision choir</b><br>each voice walks a different modulus.<br>brightness is reserved for the moments they agree.</div>
+<script>
+const voices = [7, 11, 13, 17, 19, 23];
+let tick = 0, canvas;
+function setup(){
+  canvas=createCanvas(windowWidth,windowHeight); pixelDensity(1); noStroke();
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
+function draw(){
+  background(8,10,15,34);
+  const cx=width*.53, cy=height*.48, R=min(width,height)*.40;
+  translate(cx,cy);
+  for(let i=0;i<voices.length;i++){
+    const m=voices[i], phase=(tick+i*19)%m, theta=(phase/m)*TWO_PI-HALF_PI;
+    const x=cos(theta)*R, y=sin(theta)*R;
+    const agreement=voices.reduce((n,v)=>n+(((tick+i*19)%v)===phase?1:0),0);
+    fill(70+i*22,105+i*15,135+i*10,115);
+    ellipse(x,y,3+i*.7,3+i*.7);
+    stroke(100,150,190,18); strokeWeight(1);
+    line(0,0,x,y); noStroke();
+    for(let j=1;j<5;j++){let a=theta+j*.015*sin(tick*.02+i);fill(130+agreement*18,120+agreement*14,105+agreement*20,20+agreement*8);ellipse(cos(a)*R*j/5,sin(a)*R*j/5,2,2)}
+  }
+  let collisions=0;
+  for(let a=0;a<voices.length;a++)for(let b=a+1;b<voices.length;b++)if((tick%voices[a])===(tick%voices[b]))collisions++;
+  const pulse=constrain(collisions/8,0,1);
+  fill(190+60*pulse,180+50*pulse,150+80*pulse,180+75*pulse);
+  ellipse(0,0,8+pulse*38,8+pulse*38);
+  fill(190,180,160,28); ellipse(0,0,34+pulse*70,34+pulse*70);
+  resetMatrix();
+  fill(150,145,138,90); textSize(11); textAlign(RIGHT); text('t = '+tick+'   /   agreements: '+collisions,width-22,24);
+  tick++;
+}
+function mousePressed(){tick+=Math.floor(random(20,160));}
+</script>
+</body>
+</html>
