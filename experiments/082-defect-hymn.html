@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>defect hymn</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #090b0d; color: #d6d0bd; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #readout { position: fixed; left: 22px; bottom: 18px; max-width: min(490px, calc(100vw - 44px)); font-size: 11px; letter-spacing: .05em; line-height: 1.55; color: rgba(214,208,189,.7); pointer-events: none; }
+    #title { position: fixed; left: 22px; top: 18px; font-size: 12px; letter-spacing: .18em; text-transform: lowercase; color: #e1d7bb; pointer-events: none; }
+    #hint { position: fixed; right: 22px; bottom: 18px; font-size: 10px; letter-spacing: .1em; color: rgba(214,208,189,.42); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="title">defect hymn</div>
+  <div id="readout"></div>
+  <div id="hint">click: change the treaty</div>
+<script>
+let treaty = 0;
+let lastBeat = -1;
+const treaties = [
+  [5, 8, 13], [7, 11, 17], [8, 13, 21], [11, 18, 29]
+];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+}
+
+function draw() {
+  background(9, 11, 13);
+  const t = millis() * 0.00022;
+  const [a, b, c] = treaties[treaty];
+  const gap = max(10, min(18, width / 70));
+  const cols = ceil(width / gap) + 2;
+  const rows = ceil(height / gap) + 2;
+  const beat = floor(t * 10);
+  let defects = 0;
+
+  // Three incompatible local calendars vote on the same moment.
+  // Agreement makes pale ground; two-against-one leaves a mobile seam.
+  for (let y = -1; y < rows; y++) {
+    for (let x = -1; x < cols; x++) {
+      const px = x * gap, py = y * gap;
+      const u = x + floor(9 * sin(t * 1.7));
+      const v = y + floor(7 * cos(t * 1.23));
+      const w = x + y + floor(t * 19);
+      const va = ((u % a) + a) % a;
+      const vb = ((v % b) + b) % b;
+      const vc = ((w % c) + c) % c;
+      const pa = sin(TWO_PI * (va / a) + t * 5.0);
+      const pb = sin(TWO_PI * (vb / b) - t * 4.0);
+      const pc = sin(TWO_PI * (vc / c) + t * 3.0);
+      const signs = (pa > 0 ? 1 : 0) + (pb > 0 ? 1 : 0) + (pc > 0 ? 1 : 0);
+      const split = signs === 1 || signs === 2;
+      const consensus = abs(pa + pb + pc) / 3;
+      if (split) defects++;
+
+      if (split) {
+        const heat = 110 + 105 * (1 - consensus);
+        fill(heat, 87 + 55 * sin((x-y)*.12 + t*8), 58, 165);
+        rect(px + 1, py + 1, gap - 2, gap - 2);
+        if ((x * 17 + y * 31 + beat) % 9 === 0) {
+          fill(231, 207, 133, 180);
+          circle(px + gap * .5, py + gap * .5, max(1.5, gap * .17));
+        }
+      } else {
+        fill(51 + consensus * 28, 63 + consensus * 20, 66 + consensus * 17, 90);
+        rect(px + 1, py + 1, gap - 2, gap - 2);
+      }
+    }
+  }
+  const total = cols * rows;
+  document.getElementById('readout').textContent =
+    `three clocks: ${a} · ${b} · ${c}  /  ${defects} of ${total} sites are carrying disagreement\n` +
+    `the seams are not failures; they are where incompatible counts briefly share a border.`;
+}
+
+function mousePressed() { treaty = (treaty + 1) % treaties.length; }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
