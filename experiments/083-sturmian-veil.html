@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sturmian veil</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #06080b; color: #d7ddd5; }
+    canvas { display: block; }
+    .caption { position: fixed; left: 22px; bottom: 18px; max-width: min(520px, calc(100vw - 44px)); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(215,221,213,.62); pointer-events: none; }
+    #readout { color: rgba(231,201,126,.88); }
+  </style>
+</head>
+<body>
+  <div class="caption"><span id="readout"></span><br>two intervals cut from one circling point; their disagreement makes a veil</div>
+  <script>
+    const phi = (1 + Math.sqrt(5)) / 2;
+    let drift = 0;
+    let readout;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      readout = document.getElementById('readout');
+      noStroke();
+    }
+
+    function draw() {
+      background(6, 8, 11, 40);
+      const spacing = max(5, min(12, width / 115));
+      const cols = ceil(width / spacing) + 2;
+      const rows = ceil(height / spacing) + 2;
+      const phase = drift * 0.00019;
+      const gateA = 1 / phi;
+      const gateB = 1 / (phi * phi);
+      let crossings = 0;
+
+      for (let y = 0; y < rows; y++) {
+        const band = y / rows;
+        for (let x = 0; x < cols; x++) {
+          const n = x + y * cols;
+          const orbit = (n * gateA + phase + band * 0.31) % 1;
+          const neighbor = ((n + 1) * gateA + phase + band * 0.31) % 1;
+          const a = orbit < gateA;
+          const b = neighbor < gateB;
+          const seam = a !== b;
+          const echo = ((x * gateB + y * gateA + phase * 3) % 1) < 0.09;
+          if (seam) crossings++;
+          if (seam || (echo && a)) {
+            const pulse = 0.5 + 0.5 * sin(drift * 0.018 + x * 0.39 - y * 0.21);
+            const alpha = seam ? 96 + pulse * 88 : 24 + pulse * 28;
+            if (seam) fill(228, 193, 106, alpha);
+            else fill(89, 150, 158, alpha);
+            const wobble = sin((x + y) * 0.77 + drift * 0.013) * 1.4;
+            rect(x * spacing + wobble, y * spacing, spacing * 0.78, spacing * (seam ? 0.34 : 0.16));
+          }
+        }
+      }
+
+      fill(238, 225, 184, 150);
+      rect(0, height * (0.5 + 0.18 * sin(drift * 0.0017)), width, 1);
+      readout.textContent = `STURMIAN VEIL  /  step ${floor(drift)}  /  crossings ${crossings}`;
+      drift += 1;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
