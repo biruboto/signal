@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>echo allotment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080b10; color: #dce1d8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 22px; bottom: 20px; max-width: 31rem; font-size: 11px; line-height: 1.55; letter-spacing: .025em; color: #9ca59d; pointer-events: none; }
+    #caption b { color: #d7ded3; font-weight: 500; }
+    #readout { position: fixed; right: 22px; top: 19px; font-size: 10px; line-height: 1.6; text-align: right; letter-spacing: .08em; color: #8d978f; pointer-events: none; }
+    #hint { position: fixed; right: 22px; bottom: 20px; font-size: 10px; letter-spacing: .06em; color: #69736c; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>echo allotment</b><br>Each row receives a different interval. When its small clock and its borrowed clock agree, it leaves a mark for the other rows to inherit.</div>
+  <div id="hint">click to reseed the intervals</div>
+<script>
+let rows = [], seed = 1, epoch = 0;
+const readout = document.getElementById('readout');
+
+function makeRows() {
+  randomSeed(seed);
+  const count = Math.max(10, Math.floor((height - 120) / 32));
+  rows = [];
+  for (let r = 0; r < count; r++) {
+    const a = Math.floor(random(5, 20));
+    const b = Math.floor(random(7, 29));
+    rows.push({ a, b, offset: Math.floor(random(a * b)), residue: Math.floor(random(0, a)), marks: [] });
+  }
+  epoch = millis();
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  makeRows();
+}
+
+function draw() {
+  background(8, 11, 16, 34);
+  const t = Math.floor((millis() - epoch) / 170);
+  const top = 62;
+  const bottom = height - 68;
+  const gap = (bottom - top) / rows.length;
+  noStroke();
+
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const y = top + (r + .5) * gap;
+    const period = row.a * row.b;
+    const local = (t + row.offset) % period;
+    const align = local % row.a === row.residue && local % row.b === 0;
+    const debt = (local % row.a) / row.a;
+
+    fill(42, 51, 58, 100);
+    rect(20, y, width - 40, 1);
+
+    if (align) row.marks.push({ x: width - 28, born: t, strength: 1 });
+    for (let i = row.marks.length - 1; i >= 0; i--) {
+      const m = row.marks[i];
+      const age = t - m.born;
+      const x = width - 28 - age * (4.1 + r % 3 * .23);
+      const alpha = Math.max(0, 155 - age * 2.2);
+      if (x < 20 || alpha <= 0) { row.marks.splice(i, 1); continue; }
+      fill(116 + (r * 19) % 70, 185, 165, alpha);
+      rect(x, y - 2.5, 2, 6);
+      if (i % 3 === 0) { fill(174, 218, 193, alpha * .28); circle(x, y, 8 + (1 - debt) * 12); }
+    }
+
+    const markerX = 20 + debt * (width - 40);
+    fill(107, 122, 114, 100);
+    circle(markerX, y, 3);
+    fill(104, 114, 108, 145);
+    textSize(9);
+    text(`${String(r + 1).padStart(2, '0')}  ${row.a}:${row.b}`, 24, y - 7);
+  }
+
+  fill(192, 204, 194, 165);
+  textSize(10);
+  text('THE FIELD DOES NOT KEEP ITS OWN TIME', 22, 27);
+  readout.textContent = `TICK ${String(t).padStart(5, '0')}\n${rows.length} ALLOTMENTS\n${rows.reduce((n, row) => n + row.marks.length, 0)} TRAVELLING ECHOES`;
+}
+
+function mousePressed() { seed = (seed * 1664525 + 1013904223) >>> 0; makeRows(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); makeRows(); }
+</script>
+</body>
+</html>
