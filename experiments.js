@@ -85,8 +85,11 @@ const experiments = [
 ];
 
 const list = document.getElementById('experiment-list');
+const archiveList = document.getElementById('archive-list');
+const archiveMore = document.getElementById('archive-more');
 const archiveNote = document.getElementById('archive-note');
 const latestLink = document.getElementById('latest-link');
+const recentCount = 12;
 
 if (archiveNote && experiments.length > 0) {
   const newest = experiments[0].date;
@@ -111,6 +114,10 @@ if (experiments.length === 0) {
         <span class="experiment-date">${exp.date}</span>
       </a>
     `;
-    list.appendChild(li);
+    (index < recentCount ? list : archiveList)?.appendChild(li);
   });
+
+  if (archiveMore && experiments.length <= recentCount) {
+    archiveMore.hidden = true;
+  }
 }

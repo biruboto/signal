@@ -154,6 +154,49 @@ h2 {
   white-space: nowrap;
 }
 
+.archive-more {
+  margin-top: 1.15rem;
+  color: var(--dim);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+}
+
+.archive-more summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.archive-more summary:hover {
+  color: var(--fg);
+}
+
+#archive-list {
+  list-style: none;
+  margin-top: 1.15rem;
+}
+
+#archive-list li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--dim);
+}
+
+#archive-list li:first-child {
+  border-top: 1px solid var(--dim);
+}
+
+#archive-list a {
+  color: var(--fg);
+  text-decoration: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+}
+
+#archive-list a:hover {
+  color: var(--accent);
+}
+
 .about {
   margin-top: 4rem;
   padding: 2rem 0;
@@ -202,7 +245,8 @@ footer a:hover {
     font-size: 2rem;
   }
   
-  #experiment-list a {
+  #experiment-list a,
+  #archive-list a {
     flex-direction: column;
     gap: 0.25rem;
   }
