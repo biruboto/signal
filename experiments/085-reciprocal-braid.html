@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>reciprocal braid</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090d; color: #d8dde2; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #note { position: fixed; left: 22px; bottom: 18px; max-width: 430px; line-height: 1.45; letter-spacing: .025em; color: #a9b2bc; pointer-events: none; }
+    #title { color: #eef1eb; margin-bottom: 5px; }
+    #readout { color: #7f929f; }
+  </style>
+</head>
+<body>
+  <div id="note"><div id="title">reciprocal braid</div><div id="readout"></div></div>
+<script>
+let strands = [], tick = 0, lastTime = 0;
+const hues = [[89, 184, 180], [211, 155, 91], [183, 112, 176]];
+const ratios = [(Math.sqrt(5)-1)/2, Math.sqrt(2)-1, Math.sqrt(3)-1];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  resetBraid();
+}
+
+function resetBraid() {
+  strands = ratios.map((r, k) => ({ r, k, x: -width * .05, y: height * (.30 + k * .20), phase: k * .271, points: [] }));
+  tick = 0;
+  background(7, 9, 13);
+}
+
+function draw() {
+  const now = millis();
+  if (now - lastTime < 34) return;
+  lastTime = now;
+  tick++;
+  for (const s of strands) grow(s);
+  if (tick % 8 === 0) veil();
+  if (strands[0].x > width * 1.08) resetBraid();
+  document.getElementById('readout').textContent = `three irrational debts · step ${tick} · crossings remember only the remainder`;
+}
+
+function grow(s) {
+  const a = fract((tick + 1) * s.r + s.phase);
+  const b = fract((tick + 1) / (1 + s.k * 2) * (1 - s.r));
+  const oldX = s.x, oldY = s.y;
+  s.x += 3.1 + a * 2.7;
+  // Each stream turns according to the reciprocal of its own recent remainder.
+  const impulse = (a < .5 ? -1 : 1) * (10 + 42 / (1 + 12 * Math.abs(a - .5)));
+  const pull = (height * (.30 + s.k * .20) - s.y) * .018;
+  s.y = constrain(s.y + impulse * .09 + pull + (b - .5) * 5, height * .08, height * .92);
+  s.points.push({x:s.x, y:s.y});
+  if (s.points.length > 210) s.points.shift();
+
+  const c = hues[s.k];
+  stroke(c[0], c[1], c[2], 150);
+  strokeWeight(1.15);
+  line(oldX, oldY, s.x, s.y);
+  noStroke();
+  fill(c[0], c[1], c[2], 95);
+  circle(s.x, s.y, 2.2 + 5 * b);
+
+  // A crossing is not measured geometrically; it is declared when two remainders nearly coincide.
+  for (const other of strands) {
+    if (other === s) continue;
+    const q = fract(tick * other.r + other.phase);
+    if (Math.abs(a - q) < .012 && Math.abs(s.y - other.y) < 32) {
+      fill(238, 237, 207, 110);
+      circle(s.x, (s.y + other.y) / 2, 3 + 18 * (0.012 - Math.abs(a-q)));
+    }
+  }
+}
+
+function veil() {
+  noStroke();
+  fill(7, 9, 13, 4);
+  rect(0, 0, width, height);
+}
+function fract(n) { return n - Math.floor(n); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); resetBraid(); }
+function mousePressed() { resetBraid(); }
+</script>
+</body>
+</html>
