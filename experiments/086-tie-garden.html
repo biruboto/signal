@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tie garden</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0c; color: #d9ded7; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #note { position: fixed; left: 22px; bottom: 18px; max-width: 455px; line-height: 1.45; letter-spacing: .025em; color: #a9b2ac; pointer-events: none; }
+    #title { color: #eef0e9; margin-bottom: 5px; }
+    #readout { color: #788b86; }
+  </style>
+</head>
+<body>
+  <div id="note"><div id="title">tie garden</div><div id="readout"></div></div>
+<script>
+let cells = [], cols, rows, spacing = 26, epoch = 0, seed = 17, last = 0;
+const clocks = [Math.sqrt(2) - 1, Math.sqrt(3) - 1, (Math.sqrt(5) - 1) / 2];
+const inks = [[84, 174, 159], [207, 137, 83], [151, 111, 177]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  plant();
+}
+
+function plant() {
+  cols = Math.ceil(width / spacing) + 2;
+  rows = Math.ceil(height / spacing) + 2;
+  cells = [];
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    cells.push({ i, j, owner: -1, age: 0, tie: 0, residue: 0 });
+  }
+  background(8, 10, 12);
+  epoch = 0;
+}
+
+function draw() {
+  if (millis() - last < 48) return;
+  last = millis(); epoch++;
+  noStroke(); fill(8, 10, 12, 16); rect(0, 0, width, height);
+  let switches = 0, nearTies = 0;
+  for (const cell of cells) {
+    const x = (cell.i - .5) * spacing, y = (cell.j - .5) * spacing;
+    let scores = clocks.map((clock, k) => claim(cell, clock, k));
+    let order = scores.map((v, k) => k).sort((a, b) => scores[b] - scores[a]);
+    let owner = order[0], margin = scores[owner] - scores[order[1]];
+    const changed = cell.owner !== -1 && owner !== cell.owner;
+    if (changed) { cell.age = 1; switches++; }
+    else cell.age *= .92;
+    cell.tie = lerp(cell.tie, constrain(1 - margin * 6.5, 0, 1), .24);
+    cell.owner = owner;
+    if (cell.tie > .72) nearTies++;
+    const c = inks[owner], r = 1.5 + 4.8 * cell.tie + 3.2 * cell.age;
+    fill(c[0], c[1], c[2], 32 + 90 * cell.tie + 80 * cell.age);
+    circle(x, y, r);
+    if (changed) {
+      noFill(); stroke(236, 232, 205, 120); strokeWeight(.7);
+      circle(x, y, r * (2.3 + cell.tie * 2)); noStroke();
+    }
+  }
+  document.getElementById('readout').textContent = `three irrational claimants · epoch ${epoch} · ${switches} inheritances · ${nearTies} almost undecided`;
+}
+
+function claim(cell, clock, k) {
+  // Every plot hears the same clock differently. Leadership changes only at a local argument.
+  const local = (cell.i * (k + 2) + cell.j * (k * 3 + 1) + seed * (k + 5)) * clock;
+  const tide = epoch * clock * (.31 + k * .07);
+  const folded = fract(local + tide);
+  const bias = Math.sin((cell.i - cell.j) * clock * 3.1 + epoch * .017 * (k + 1));
+  return 1 - Math.abs(folded - .5) * 2 + bias * .13;
+}
+function fract(n) { return n - Math.floor(n); }
+function mousePressed() { seed = Math.floor(random(1, 99999)); plant(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); plant(); }
+</script>
+</body>
+</html>
