@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>leakage choir</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #080b0e; color: #d9ddd5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #note { position: fixed; left: 22px; bottom: 19px; font-size: 11px; letter-spacing: .08em; line-height: 1.55; color: #a9b3a7; pointer-events: none; }
+  #title { color: #e5eadf; }
+  #meter { color: #738c71; }
+</style>
+</head>
+<body>
+<div id="note"><span id="title">leakage choir</span><br><span id="meter"></span></div>
+<script>
+let bins = [], history = [], t = 0;
+const voices = 19, depth = 120;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  resetChoir();
+}
+
+function resetChoir() {
+  bins = Array.from({length: voices}, (_, i) => ({
+    mass: (i * i * 17 + 31) % 97 + 8,
+    phase: (i * 43) % 101
+  }));
+  history = Array.from({length: depth}, () => Array(voices).fill(0));
+  t = 0;
+}
+
+function draw() {
+  background(8, 11, 14);
+  let row = [], escaped = 0;
+  for (let i = 0; i < voices; i++) {
+    const a = bins[i];
+    const left = bins[(i - 1 + voices) % voices];
+    const right = bins[(i + 1) % voices];
+    // Each voice leaks only when its private clock agrees with a borrowed neighbor.
+    const gate = (t + a.phase + left.phase * 2) % (7 + i % 9);
+    const leak = gate === 0 ? floor(a.mass / (3 + (right.phase % 5))) : 0;
+    a.mass -= leak;
+    bins[(i + 1) % voices].mass += leak;
+    if (a.mass > 180) { escaped += a.mass - 180; a.mass = 180; }
+    row.push(leak);
+  }
+  history.push(row); history.shift();
+  t++;
+
+  const margin = min(width, height) * .09;
+  const plotW = width - margin * 2, plotH = height - margin * 2;
+  noStroke();
+  for (let y = 0; y < depth; y++) {
+    for (let x = 0; x < voices; x++) {
+      const v = history[y][x];
+      if (!v) continue;
+      const pulse = constrain(v * 25 + 25, 0, 230);
+      fill(95 + pulse * .35, 142 + pulse * .18, 106 + pulse * .18, 80 + pulse * .65);
+      rect(margin + x * plotW / voices, margin + y * plotH / depth,
+           plotW / voices - 1, plotH / depth - 1);
+    }
+  }
+  stroke(122, 151, 117, 105); strokeWeight(1);
+  noFill(); rect(margin, margin, plotW, plotH);
+  noStroke();
+  for (let i = 0; i < voices; i++) {
+    const h = map(bins[i].mass, 0, 180, 2, 32);
+    fill(177, 197, 166, 150);
+    rect(margin + i * plotW / voices + 2, margin - h - 7, plotW / voices - 5, h);
+  }
+  document.getElementById('meter').textContent = `nineteen vessels · ${t.toString().padStart(5, '0')} turns · ${escaped ? escaped + ' lost to the rim' : 'nothing has left'} · click to reseed`;
+}
+function mousePressed() { resetChoir(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
