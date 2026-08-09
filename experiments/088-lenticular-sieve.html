@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>lenticular sieve</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #090b10; color: #d9d8cf; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #note { position: fixed; left: 22px; bottom: 18px; z-index: 2; font-size: 11px; letter-spacing: .075em; line-height: 1.55; color: #aaaeb0; pointer-events: none; }
+  #title { color: #e6e4d9; }
+  #readout { color: #8faeb8; }
+</style>
+</head>
+<body>
+<div id="note"><span id="title">lenticular sieve</span><br><span id="readout"></span></div>
+<script>
+let phase = 0, frame = 0;
+const phi = (1 + Math.sqrt(5)) / 2;
+const silver = 1 + Math.sqrt(2);
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+}
+
+function bit(n, slope, offset) {
+  return Math.floor((n + 1) * slope + offset) - Math.floor(n * slope + offset);
+}
+
+function draw() {
+  background(9, 11, 16);
+  const cols = Math.max(18, Math.floor(width / 26));
+  const rows = Math.max(12, Math.floor(height / 26));
+  const cellW = width / cols, cellH = height / rows;
+  let accords = 0, fractures = 0;
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const n = x + y * cols;
+      const a = bit(n, phi, phase * 0.013);
+      const b = bit(n + y * 3, silver, phase * 0.007);
+      const c = bit(n + x * 5, phi * silver, phase * 0.003);
+      const agree = a === b;
+      if (agree) accords++; else fractures++;
+      const cx = x * cellW + cellW / 2, cy = y * cellH + cellH / 2;
+      const radius = Math.min(cellW, cellH) * (agree ? .44 : .22);
+      const drift = ((n * 17 + phase) % 41) / 41 - .5;
+
+      if (agree) {
+        fill(a ? 126 : 62, a ? 179 : 114, a ? 178 : 159, 170);
+        ellipse(cx + drift * 5, cy, radius * 1.8, radius * .78);
+        fill(c ? 235 : 178, c ? 202 : 181, c ? 121 : 210, 105);
+        ellipse(cx - drift * 5, cy, radius * .78, radius * 1.8);
+      } else {
+        fill(80, 77, 95, 125);
+        rect(cx - radius / 2, cy - radius / 2, radius, radius);
+        fill(196, 108, 112, 130);
+        rect(cx - 1, cy - radius * .7, 2, radius * 1.4);
+      }
+    }
+  }
+
+  stroke(171, 182, 188, 35); strokeWeight(1); noFill();
+  rect(18, 18, width - 36, height - 36);
+  noStroke();
+  frame++;
+  if (frame % 8 === 0) {
+    document.getElementById('readout').textContent = `${accords} coincident cuts · ${fractures} seams · three incommensurate rulers · click to turn the lens`;
+  }
+}
+
+function mousePressed() { phase = (phase + 97) % 100000; }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
