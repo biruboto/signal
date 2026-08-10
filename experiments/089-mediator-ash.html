@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mediator ash</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #0a0b0d; color: #d8d4cb; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #note { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .075em; line-height: 1.55; color: #aaa79e; pointer-events: none; }
+  #title { color: #e5e0d4; }
+  #readout { color: #b99b72; }
+</style>
+</head>
+<body>
+<div id="note"><span id="title">mediator ash</span><br><span id="readout"></span></div>
+<script>
+let generation = 0, offset = 0;
+const gold = (1 + Math.sqrt(5)) / 2;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+}
+
+// Farey neighbors a/b and c/d make a mediator (a+c)/(b+d).
+// We keep only mediators whose denominators cross a moving irrational threshold.
+function draw() {
+  background(10, 11, 13);
+  const margin = Math.max(34, Math.min(width, height) * .075);
+  const horizon = height * .56;
+  const layers = Math.max(7, Math.min(11, Math.floor(Math.log2(width)) - 1));
+  const threshold = 11 + ((Math.floor(frameCount / 38) + offset) % 31);
+  let surviving = 0, total = 0, heat = 0;
+  let intervals = [{ a: 0, b: 1, c: 1, d: 1, x0: margin, x1: width - margin }];
+
+  for (let level = 0; level < layers; level++) {
+    const next = [];
+    const y = horizon - level * Math.min(height * .055, 42);
+    for (const q of intervals) {
+      const m = q.a + q.c, n = q.b + q.d;
+      const x = (q.x0 + q.x1) / 2;
+      const fractional = (n * gold + level * .618 + generation * .071) % 1;
+      const crossing = (n % threshold) < Math.max(1, Math.floor(fractional * 4));
+      total++;
+      if (crossing) {
+        surviving++;
+        const ember = 72 + fractional * 140;
+        heat += ember;
+        fill(ember + 25, 104 + ember * .34, 63 + ember * .18, 150);
+        const r = 1.2 + Math.min(7, Math.sqrt(n) * .62);
+        ellipse(x, y, r * 1.45, r);
+        fill(221, 181, 117, 38);
+        ellipse(x + Math.sin(n + generation) * r, y - r * 2, r * .55, r * .55);
+      } else {
+        fill(91, 89, 84, 36);
+        rect(x, y, 1, 1);
+      }
+      next.push({ a: q.a, b: q.b, c: m, d: n, x0: q.x0, x1: x });
+      next.push({ a: m, b: n, c: q.c, d: q.d, x0: x, x1: q.x1 });
+    }
+    intervals = next;
+  }
+
+  stroke(186, 163, 123, 50); strokeWeight(1); noFill();
+  line(margin, horizon + 20, width - margin, horizon + 20);
+  stroke(111, 106, 97, 32); line(margin, margin, margin, horizon + 20);
+  noStroke();
+  generation++;
+  const warmth = surviving ? Math.round(heat / surviving) : 0;
+  document.getElementById('readout').textContent = `${total} mediators · ${surviving} crossed the ${threshold}-gate · ash warmth ${warmth} · click to shift the gate`;
+}
+
+function mousePressed() { offset = (offset + 7) % 31; }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
