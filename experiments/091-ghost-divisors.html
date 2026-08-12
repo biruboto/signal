@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ghost divisors</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:#080a0d;color:#c8d1ce;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}.head{position:fixed;left:20px;top:18px;z-index:2;pointer-events:none}.head h1{font-size:12px;letter-spacing:.18em;font-weight:400;margin:0 0 7px;color:#e3e9e4}.head p{font-size:10px;line-height:1.5;letter-spacing:.06em;margin:0;color:#75817d;max-width:350px}.readout{position:fixed;right:20px;bottom:18px;text-align:right;z-index:2;font-size:10px;line-height:1.6;letter-spacing:.06em;color:#89938f;pointer-events:none}.hint{position:fixed;left:20px;bottom:18px;font-size:9px;letter-spacing:.1em;color:#4e5956;z-index:2;pointer-events:none}@media(max-width:600px){.head{left:14px;top:14px}.readout{right:14px;bottom:14px}.hint{left:14px;bottom:14px}.head p{max-width:270px}}
+</style>
+</head>
+<body>
+<div class="head"><h1>GHOST DIVISORS</h1><p>Three clocks cast residues onto a shared floor. A mark appears only where a number almost divides the light.</p></div>
+<div class="readout" id="readout"></div><div class="hint">click to replace the clocks</div>
+<script>
+let mods, phase, tick=0;
+function chooseClocks(){
+  const choices=[[17,23,29],[19,31,37],[23,29,41],[29,37,43],[31,41,47],[17,31,43]];
+  mods=random(choices); phase=mods.map(m=>floor(random(m)));
+}
+function setup(){createCanvas(windowWidth,windowHeight); pixelDensity(1); chooseClocks(); background(8,10,13);}
+function draw(){
+  background(8,10,13,34); tick++;
+  const cell=width<600?17:21, cols=ceil(width/cell), rows=ceil(height/cell);
+  noStroke();
+  let witnesses=0, closest=99;
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    const n=x*11+y*17+floor(tick/5);
+    let debt=0, twist=0;
+    for(let k=0;k<3;k++){
+      const r=((n*(k*2+3)+phase[k])%mods[k]+mods[k])%mods[k];
+      debt+=min(r,mods[k]-r)/(mods[k]/2);
+      twist+=sin((r/mods[k])*TWO_PI+(x-y)*.07);
+    }
+    closest=min(closest,debt);
+    const glow=pow(max(0,1-debt/1.04),2.5);
+    if(glow>.03){
+      witnesses++;
+      const hue=map(twist,-3,3,154,212), a=40+glow*195;
+      fill(hue,185,155,a); // HSB-like values softened below with RGB mix
+      const cx=x*cell+cell*.5, cy=y*cell+cell*.5;
+      const r=cell*(.12+glow*.62);
+      fill(75+glow*80,155+glow*70,145+glow*65,a);
+      circle(cx,cy,r);
+      if(glow>.55){fill(210,232,205,glow*100);circle(cx,cy,r*.24);}
+    }
+  }
+  if(tick%4===0){
+    phase=phase.map((p,k)=>(p+(k===0?1:k===1?2:3))%mods[k]);
+  }
+  document.getElementById('readout').innerHTML=`clocks: ${mods.join(' · ')}<br>witnesses: ${witnesses}<br>nearest missed division: ${closest.toFixed(3)}`;
+}
+function mousePressed(){chooseClocks(); tick=0; background(8,10,13);}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(8,10,13);}
+</script>
+</body></html>
