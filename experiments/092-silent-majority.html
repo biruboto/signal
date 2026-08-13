@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>silent majority</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:#08090c;color:#c8d0ca;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}.head{position:fixed;left:20px;top:18px;z-index:2;pointer-events:none}.head h1{font-size:12px;letter-spacing:.18em;font-weight:400;margin:0 0 7px;color:#e3e9e4}.head p{font-size:10px;line-height:1.5;letter-spacing:.06em;margin:0;color:#75817d;max-width:365px}.readout{position:fixed;right:20px;bottom:18px;text-align:right;z-index:2;font-size:10px;line-height:1.6;letter-spacing:.06em;color:#89938f;pointer-events:none}.hint{position:fixed;left:20px;bottom:18px;font-size:9px;letter-spacing:.1em;color:#4e5956;z-index:2;pointer-events:none}@media(max-width:600px){.head{left:14px;top:14px}.readout{right:14px;bottom:14px}.hint{left:14px;bottom:14px}.head p{max-width:280px}}
+</style>
+</head>
+<body>
+<div class="head"><h1>SILENT MAJORITY</h1><p>Each cell takes a vote among four incompatible periods. Only the minority is allowed to leave a trace.</p></div>
+<div class="readout" id="readout"></div><div class="hint">click to reseed the electorate</div>
+<script>
+let periods, offsets, t=0;
+function reseed(){
+  const sets=[[11,17,23,29],[13,19,31,37],[17,23,31,41],[19,29,37,43],[11,23,37,47]];
+  periods=random(sets); offsets=periods.map(p=>floor(random(p)));
+}
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);colorMode(HSB,360,100,100,255);reseed();background(222,25,5)}
+function draw(){
+  background(222,25,5,38);t++;
+  const step=width<600?13:16, cols=ceil(width/step), rows=ceil(height/step);
+  let dissent=0, quiet=0, edge=0;
+  noStroke();
+  for(let gy=0;gy<rows;gy++)for(let gx=0;gx<cols;gx++){
+    const n=gx*7+gy*13+floor(t/3);
+    let votes=[0,0,0,0], raw=[];
+    for(let k=0;k<4;k++){
+      const q=((n*(k*3+2)+offsets[k])%periods[k]+periods[k])%periods[k];
+      const v=floor(q/periods[k]*4); votes[v]++; raw.push(q/periods[k]);
+    }
+    const majority=max(votes), minority=min(votes);
+    const lone=votes.indexOf(minority), dominant=votes.indexOf(majority);
+    const fracture=majority-minority;
+    if(fracture===0){quiet++;continue}
+    dissent++;
+    const cx=gx*step+step*.5, cy=gy*step+step*.5;
+    const pull=raw[lone]-.5, drift=sin((gx+gy)*.18+t*.025+pull*8);
+    const len=step*(.22+fracture*.25);
+    const hue=155+lone*27+drift*12;
+    const alpha=35+fracture*46;
+    stroke(hue,50+fracture*12,70+fracture*7,alpha);strokeWeight(fracture===3?1.5:1);
+    line(cx-len,cy+pull*step*.5,cx+len,cy-pull*step*.5);
+    if(fracture===3){noStroke();fill(hue,35,95,110);circle(cx,cy,step*.18);edge++}
+  }
+  if(t%5===0)offsets=offsets.map((o,k)=>(o+k+1)%periods[k]);
+  document.getElementById('readout').innerHTML=`periods: ${periods.join(' · ')}<br>minority traces: ${dissent}<br>unanimous fractures: ${edge}<br>quiet cells: ${quiet}`;
+}
+function mousePressed(){reseed();t=0;background(222,25,5)}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(222,25,5)}
+</script>
+</body></html>
