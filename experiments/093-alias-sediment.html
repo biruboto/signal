@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>alias sediment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:#070a0d;color:#cbd4cf;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}.head{position:fixed;left:20px;top:18px;z-index:2;pointer-events:none}.head h1{font-size:12px;letter-spacing:.18em;font-weight:400;margin:0 0 7px;color:#e4eae5}.head p{font-size:10px;line-height:1.5;letter-spacing:.06em;margin:0;color:#77837f;max-width:370px}.readout{position:fixed;right:20px;bottom:18px;text-align:right;z-index:2;font-size:10px;line-height:1.6;letter-spacing:.06em;color:#89958f;pointer-events:none}.hint{position:fixed;left:20px;bottom:18px;font-size:9px;letter-spacing:.1em;color:#4d5a56;z-index:2;pointer-events:none}@media(max-width:600px){.head{left:14px;top:14px}.readout{right:14px;bottom:14px}.hint{left:14px;bottom:14px}.head p{max-width:285px}}
+</style>
+</head>
+<body>
+<div class="head"><h1>ALIAS SEDIMENT</h1><p>Two clocks sample the same slope at different rates. Where their mistaken readings agree, matter accumulates.</p></div>
+<div class="readout" id="readout"></div><div class="hint">click to choose another pair of clocks</div>
+<script>
+let a,b,oa,ob,t=0,grains=[];
+function reseed(){
+  const pairs=[[17,29],[19,31],[23,37],[29,41],[31,43]];
+  [a,b]=random(pairs);oa=floor(random(a));ob=floor(random(b));grains=[];t=0;
+}
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);colorMode(HSB,360,100,100,255);reseed();background(210,38,5)}
+function draw(){
+  background(210,38,5,24);t++;
+  const cell=width<600?12:15, cols=ceil(width/cell), rows=ceil(height/cell);
+  let accords=0, near=0;
+  noStroke();
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    const slope=x*5+y*8+floor(t*.62);
+    const ra=((slope+oa)%a+a)%a/a;
+    const rb=((slope+ob)%b+b)%b/b;
+    const sa=floor(ra*7), sb=floor(rb*7);
+    const d=abs(ra-rb), cx=x*cell+cell*.5, cy=y*cell+cell*.5;
+    if(sa===sb){
+      accords++;
+      const h=178+sa*8+sin((x-y+t)*.07)*12;
+      fill(h,48,84,88+d*300);circle(cx,cy,cell*(.17+(1-d)*.33));
+      if((x*11+y*7+t)%37===0) grains.push({x:cx,y:cy,v:random(.16,.55),h});
+    } else if(d<.045){
+      near++;fill(42,45,90,42);rect(cx-cell*.09,cy-cell*.09,cell*.18,cell*.18);
+    }
+  }
+  for(let i=grains.length-1;i>=0;i--){
+    const g=grains[i];g.y+=g.v;g.v+=.006;fill(g.h,38,94,110);circle(g.x,g.y,1.5);
+    if(g.y>height+5)grains.splice(i,1);
+  }
+  if(grains.length>900)grains.splice(0,grains.length-900);
+  if(t%4===0){oa=(oa+1)%a;ob=(ob+2)%b}
+  document.getElementById('readout').innerHTML=`sampling periods: ${a} : ${b}<br>agreed aliases: ${accords}<br>near misses: ${near}<br>settling grains: ${grains.length}`;
+}
+function mousePressed(){reseed();background(210,38,5)}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(210,38,5)}
+</script>
+</body></html>
