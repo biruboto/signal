@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>boundary shiver</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #090b0d; color: #d9dfd8; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  canvas { display: block; }
+  #caption { position: fixed; left: 22px; bottom: 18px; max-width: 440px; letter-spacing: .025em; color: rgba(220,230,220,.68); pointer-events: none; }
+  #readout { position: fixed; right: 22px; top: 18px; text-align: right; color: rgba(220,230,220,.7); letter-spacing: .06em; pointer-events: none; }
+  #hint { position: fixed; right: 22px; bottom: 18px; color: rgba(220,230,220,.38); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="readout"></div>
+<div id="caption">a field of divisions keeps finding its edge. click to change the denominator.</div>
+<div id="hint">the boundary remembers the remainder</div>
+<script>
+let modulus = 17;
+let drift = 0;
+let readout;
+const moduli = [11, 13, 17, 19, 23, 29, 31];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  readout = document.getElementById('readout');
+  noStroke();
+}
+
+function draw() {
+  colorMode(RGB, 255);
+  background(9, 11, 13, 34);
+  colorMode(HSB, 360, 100, 100, 255);
+  const spacing = constrain(min(width, height) / 23, 18, 46);
+  const cols = floor(width / spacing) + 2;
+  const rows = floor(height / spacing) + 2;
+  const t = frameCount * 0.008;
+  let witnesses = 0;
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const n = x * 37 + y * 61 + floor(drift);
+      const a = ((n % modulus) + modulus) % modulus;
+      const b = ((x * 11 - y * 7 + floor(drift * 0.61)) % modulus + modulus) % modulus;
+      const near = min(a, modulus - a, b, modulus - b);
+      const agreement = (a * b) % modulus;
+      const isWitness = agreement === 1 || agreement === modulus - 1;
+      if (isWitness) witnesses++;
+
+      const px = (x - .5) * spacing;
+      const py = (y - .5) * spacing;
+      const wobble = sin(t + n * 0.17) * (isWitness ? 4 : 1.1);
+      const edge = map(near, 0, modulus * .5, 1, 0, true);
+      const size = 1.3 + edge * 7 + (isWitness ? 3.5 : 0);
+      const hue = isWitness ? 168 : 198 - edge * 35;
+      const alpha = 20 + edge * 105 + (isWitness ? 100 : 0);
+
+      fill(hue, 75, 73, alpha);
+      circle(px + wobble, py - wobble * .4, size);
+
+      if (isWitness) {
+        fill(180, 75, 86, 26);
+        circle(px + wobble, py - wobble * .4, size * 3.4);
+      }
+    }
+  }
+
+  drift += 0.12;
+  colorMode(RGB, 255);
+  readout.innerHTML = `denominator ${modulus}<br>${witnesses} reciprocal witnesses<br>phase ${nf(drift % modulus, 1, 2)}`;
+  colorMode(HSB, 360, 100, 100, 255);
+}
+
+function mousePressed() {
+  const i = moduli.indexOf(modulus);
+  modulus = moduli[(i + 1) % moduli.length];
+  drift = 0;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
