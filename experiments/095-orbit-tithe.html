@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>orbit tithe</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0d; color: #d8d5ca; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 24px; bottom: 20px; max-width: 440px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .035em; color: rgba(216,213,202,.72); pointer-events: none; }
+    #readout { position: fixed; right: 24px; top: 20px; text-align: right; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(216,213,202,.55); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption">Every orbit gives one unit away. The remainder chooses where the next orbit begins.</div>
+<script>
+let wells = [], grains = [], tick = 0;
+const Q = 97;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  initialize();
+}
+
+function initialize() {
+  wells = [];
+  grains = [];
+  const count = max(7, floor(width / 150));
+  for (let i = 0; i < count; i++) {
+    const phase = (i * 37) % Q;
+    wells.push({ phase, debt: 0, hue: 185 + (i * 29) % 120 });
+  }
+  background(8, 10, 13);
+}
+
+function draw() {
+  background(8, 10, 13, 34);
+  tick++;
+  const cx = width / 2, cy = height / 2;
+  const base = min(width, height) * .16;
+
+  noFill();
+  strokeWeight(1);
+  for (let ring = 1; ring < 6; ring++) {
+    stroke(70, 90, 104, 18);
+    circle(cx, cy, base * ring * 1.23);
+  }
+
+  wells.forEach((w, i) => {
+    const orbit = base * (1.15 + i * .43);
+    const a = TWO_PI * ((tick + w.phase) % Q) / Q + i * 0.71;
+    const x = cx + cos(a) * orbit;
+    const y = cy + sin(a) * orbit * .63;
+    const tithe = ((tick * (i + 3) + w.phase) % Q) < (i % 5 + 1);
+
+    if (tithe) {
+      const remainder = (w.phase + tick + i * i) % Q;
+      grains.push({ x, y, vx: cos(a + HALF_PI) * .15, vy: sin(a + HALF_PI) * .15, life: 150, seed: remainder, hue: w.hue });
+      w.debt = (w.debt + remainder) % Q;
+    }
+
+    stroke(w.hue, 55, 68, 110);
+    fill(w.hue, 50, 82, 150);
+    circle(x, y, 3 + (w.debt % 7) * .55);
+    noStroke();
+    fill(w.hue, 45, 88, 45);
+    circle(x, y, 13 + (w.debt % 11));
+  });
+
+  for (let i = grains.length - 1; i >= 0; i--) {
+    const g = grains[i];
+    const dx = cx - g.x, dy = cy - g.y;
+    const d = max(30, sqrt(dx * dx + dy * dy));
+    g.vx += dx / d * .006;
+    g.vy += dy / d * .006;
+    g.x += g.vx; g.y += g.vy; g.life--;
+    const alpha = map(g.life, 0, 150, 0, 115);
+    stroke(g.hue, 50, 85, alpha);
+    strokeWeight(1.1);
+    point(g.x, g.y);
+    if (g.life <= 0 || dist(g.x, g.y, cx, cy) < 8) grains.splice(i, 1);
+  }
+
+  noStroke();
+  fill(224, 210, 160, 150);
+  circle(cx, cy, 5 + sin(tick / 13) * 1.5);
+  document.getElementById('readout').textContent =
+    'ORBIT TITHE\nmodulus ' + Q + '\ncycle ' + nf(tick % Q, 2) + ' / ' + Q + '\nloose remainder ' + grains.length;
+}
+
+function mousePressed() { initialize(); tick = 0; }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); initialize(); }
+</script>
+</body>
+</html>
