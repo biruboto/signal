@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>convergent spill</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#080b0d;color:#c7d0c4;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block} #readout{position:fixed;left:18px;bottom:17px;letter-spacing:.08em;line-height:1.55;pointer-events:none}
+  #caption{position:fixed;right:18px;top:16px;text-align:right;color:#8e9b8b;letter-spacing:.06em;line-height:1.5;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="caption">CONVERGENT SPILL<br><span id="mode"></span></div>
+<div id="readout"></div>
+<script>
+let cols, rows, cell, field=[], generation=0, p=34, q=55, r=89;
+const readout=document.getElementById('readout'), mode=document.getElementById('mode');
+function gcd(a,b){while(b){[a,b]=[b,a%b]}return a}
+function setup(){createCanvas(windowWidth,windowHeight); pixelDensity(1); noStroke(); build();}
+function build(){
+  cell=constrain(floor(min(width,height)/48),7,16); cols=ceil(width/cell)+2; rows=ceil(height/cell)+2;
+  field=Array.from({length:cols*rows},(_,i)=>({v:0,age:floor(random(13)),seed:(i*37+generation*19)%r}));
+}
+function draw(){
+  background(8,11,13); generation++;
+  const drift=(generation%r), hinge=(generation%q);
+  let opened=0, debt=0;
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    const i=y*cols+x, a=field[i];
+    const residue=(x*p+y*q+a.seed+drift)%r;
+    const echo=(x*q-y*p+hinge)%p;
+    // A cell opens only when two successive rational approximations disagree softly.
+    const gate=(residue<5+floor(3*sin(generation*.017))) !== (echo<3);
+    if(gate){a.v=min(1,a.v+.085); a.age=0; opened++;} else {a.v*=.944; a.age++;}
+    debt+=a.v;
+    if(a.v>.012){
+      const h=(195 + residue*.42 + 20*sin((x-y+generation)*.03))%360;
+      const alpha=20+210*a.v;
+      fill(h,28+45*a.v,32+45*a.v,alpha); colorMode(HSL,360,100,100,255);
+      fill(h,28+45*a.v,32+45*a.v,alpha); rect(x*cell,y*cell,cell+1,cell+1); colorMode(RGB,255);
+    }
+  }
+  // The three Fibonacci denominators periodically trade places.
+  if(generation%233===0){[p,q,r]=[q,r,p+q]; r=((r-1)%137)+53;}
+  mode.textContent=`denominators ${p} / ${q} / ${r}`;
+  readout.textContent=`${opened} apertures\naccumulated spill ${debt.toFixed(1)}\nframe ${generation}`;
+}
+function mousePressed(){generation+=89; for(const a of field)a.v*=.18;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+</script>
+</body></html>
