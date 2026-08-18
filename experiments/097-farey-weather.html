@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farey weather</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#080b0d;color:#d7ddd3;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block} #readout{position:fixed;left:18px;bottom:16px;letter-spacing:.08em;line-height:1.5;pointer-events:none}
+  #caption{position:fixed;right:18px;top:16px;text-align:right;max-width:290px;color:#aeb8ae;line-height:1.55;pointer-events:none}
+  b{color:#e4b862;font-weight:normal}
+</style>
+</head>
+<body>
+<div id="caption"><b>farey weather</b><br>each horizon votes for the fraction nearest its slope.<br>click to change the denominator ceiling.</div>
+<div id="readout"></div>
+<script>
+let ceiling=23, t=0, readout;
+function setup(){ createCanvas(windowWidth,windowHeight); pixelDensity(1); readout=document.getElementById('readout'); noStroke(); }
+function gcd(a,b){while(b){let q=a%b;a=b;b=q}return a}
+function draw(){
+  background(8,11,13); t+=0.005;
+  let scale=max(16,min(34,width/44)), rows=ceil(height/scale)+2;
+  let totals={};
+  for(let j=0;j<rows;j++){
+    let y=j*scale-scale/2;
+    let drift=sin(j*.71+t*.81)*.32+sin(j*.173-t*.37)*.19;
+    let slope=(j/(rows-1))*1.38-.19+drift;
+    let bestP=0,bestQ=1,best=99;
+    for(let q=1;q<=ceiling;q++) for(let p=0;p<=q*2;p++){
+      if(gcd(p,q)!==1)continue;
+      let d=abs(p/q-slope);
+      if(d<best){best=d;bestP=p;bestQ=q}
+    }
+    let key=bestP+'/'+bestQ; totals[key]=(totals[key]||0)+1;
+    let hue=map(bestQ,1,ceiling,35,192)+sin(t+j*.2)*8;
+    let sat=map(bestP/bestQ,0,1.8,25,77);
+    let bri=map(best,0,.03,92,38,true);
+    for(let x=-scale;x<width+scale;x+=scale){
+      let r=noise(x*.012,j*.14,t*.18);
+      let shift=(r-.5)*scale*.65 + sin(t*1.7+j*.8)*3;
+      colorMode(HSB,360,100,100,100); fill(hue,sat,bri,72); rect(x+shift,y,scale*.93,scale*.76);
+      if(r>.66){fill(hue+22,35,100,15); rect(x+shift,y,scale*.93,2)}
+      colorMode(RGB,255);
+    }
+    if(j%3===0){ fill(226,230,217,135); textAlign(LEFT,CENTER); textSize(10); text(key,9,y+scale*.38); }
+  }
+  let dominant=Object.entries(totals).sort((a,b)=>b[1]-a[1])[0];
+  readout.innerHTML='DENOMINATOR CEILING <b>'+ceiling+'</b><br>PREVAILING FRONT <b>'+dominant[0]+'</b><br>THE AIR PREFERS SIMPLE RATIOS';
+}
+function mousePressed(){ceiling=ceiling===23?37:ceiling===37?13:23; noiseSeed(floor(random(1e8)));}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
+</script>
+</body></html>
