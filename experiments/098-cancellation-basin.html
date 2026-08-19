@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cancellation basin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+html,body{margin:0;overflow:hidden;background:#070a0c;color:#d4dcd2;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}#caption{position:fixed;right:18px;top:16px;max-width:300px;text-align:right;line-height:1.55;color:#adb9ae;pointer-events:none}#readout{position:fixed;left:18px;bottom:16px;line-height:1.55;letter-spacing:.07em;pointer-events:none}b{color:#e5b65d;font-weight:normal}
+</style>
+</head>
+<body>
+<div id="caption"><b>cancellation basin</b><br>each source sends a signed remainder toward the center.<br>opposites vanish only when they arrive together.<br>click to reseed the witnesses.</div>
+<div id="readout"></div>
+<script>
+let t=0,seed=17,readout;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);readout=document.getElementById('readout');noStroke();}
+function residue(n,m){return ((n%m)+m)%m}
+function draw(){
+  background(7,10,12);t+=0.008;
+  const step=max(18,min(34,width/42)), cols=ceil(width/step)+2, rows=ceil(height/step)+2;
+  const cx=(cols-1)/2, cy=(rows-1)/2, M=17+2*(seed%5);
+  let surviving=0, debt=0;
+  colorMode(HSB,360,100,100,100);
+  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+    let dx=i-cx,dy=j-cy,d=sqrt(dx*dx+dy*dy)+.01;
+    let a=atan2(dy,dx), shell=floor(d*1.61-t*.7);
+    let sign=residue(i*7-j*11+shell*5+seed,M)<M/2?1:-1;
+    let packet=residue(i*i+3*j*j+seed+shell*shell,M)-floor(M/2);
+    let partner=residue(floor((cx-dx)*7)-floor((cy-dy)*11)+shell*5+seed,M)<M/2?1:-1;
+    let cancelled=(sign!==partner && abs(packet)<3);
+    let pulse=sin(d*.88-t*2.1+a*5)*.5+.5;
+    let x=i*step+sin(a+t)*3,y=j*step+cos(a-t)*3;
+    if(cancelled){fill(195,12,28,13);ellipse(x,y,step*.22+2*pulse);}
+    else {let hue=sign>0?38:193;let bright=46+38*pulse;fill(hue,65,bright,62);ellipse(x,y,step*(.28+min(.46,abs(packet)/M+.12)),step*(.28+min(.46,abs(packet)/M+.12)));surviving++;debt+=abs(packet);}
+  }
+  colorMode(RGB,255);noFill();stroke(227,182,93,90);strokeWeight(1);ellipse(width/2,height/2,min(width,height)*.19+sin(t)*8);noStroke();
+  readout.innerHTML='MODULUS <b>'+M+'</b><br>SURVIVING WITNESSES <b>'+surviving+'</b><br>UNPAIRED REMAINDER <b>'+debt+'</b>';
+}
+function mousePressed(){seed=floor(random(1,10000));noiseSeed(seed);}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script>
+</body></html>
