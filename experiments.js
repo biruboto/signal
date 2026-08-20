@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '099-odometer-fog', title: 'odometer fog', date: '2026-08-20' },
   { id: '098-cancellation-basin', title: 'cancellation basin', date: '2026-08-19' },
   { id: '097-farey-weather', title: 'farey weather', date: '2026-08-18' },
   { id: '096-convergent-spill', title: 'convergent spill', date: '2026-08-17' },

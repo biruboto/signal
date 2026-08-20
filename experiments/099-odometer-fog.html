@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>odometer fog</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090c; color: #d5d4c9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #label { position: fixed; left: 22px; bottom: 19px; max-width: min(540px, calc(100vw - 44px)); font-size: 11px; line-height: 1.55; letter-spacing: .035em; color: rgba(213,212,201,.68); pointer-events: none; }
+    #label strong { display: block; color: #e7b86b; font-size: 12px; font-weight: 500; letter-spacing: .11em; text-transform: lowercase; }
+    #readout { color: rgba(213,212,201,.42); }
+  </style>
+</head>
+<body>
+  <div id="label"><strong>odometer fog</strong><span id="readout">three counters are deciding what changed</span></div>
+<script>
+let field = [];
+let tick = 0;
+let readout;
+const bases = [5, 7, 11];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  readout = document.getElementById('readout');
+  buildField();
+  background(7, 9, 12);
+}
+
+function buildField() {
+  field = [];
+  const gap = max(13, min(24, width / 55));
+  for (let y = gap * .7; y < height; y += gap) {
+    for (let x = gap * .7; x < width; x += gap) {
+      field.push({ x, y, n: floor((x * 13 + y * 17) / gap), memory: 0, hue: random() });
+    }
+  }
+}
+
+function digitSum(n, base) {
+  let sum = 0;
+  while (n > 0) { sum += n % base; n = floor(n / base); }
+  return sum;
+}
+
+function carryDepth(n, base) {
+  let depth = 0;
+  while (n > 0 && n % base === base - 1) { depth++; n = floor(n / base); }
+  return depth;
+}
+
+function draw() {
+  noStroke();
+  fill(7, 9, 12, 18);
+  rect(0, 0, width, height);
+  const step = floor(frameCount / 5);
+  if (step !== tick) tick = step;
+
+  for (const mote of field) {
+    const n = tick + mote.n;
+    const shifts = bases.map(b => digitSum(n, b) - digitSum(max(0, n - 1), b));
+    const carries = bases.map(b => carryDepth(max(0, n - 1), b));
+    const agreement = shifts.reduce((a, b) => a + b, 0);
+    const debt = carries.reduce((a, b) => a + b, 0);
+    const rare = shifts.filter(v => v < 0).length;
+    const target = rare === 0 ? .02 : (rare === 3 ? 1 : .35 + debt * .1);
+    mote.memory = lerp(mote.memory, target, .09);
+    const r = 1.1 + mote.memory * (4 + debt * 1.6);
+
+    if (rare === 3) fill(233, 184, 107, 150 * mote.memory);
+    else if (rare === 2) fill(130, 163, 183, 120 * mote.memory);
+    else if (rare === 1) fill(126, 143, 107, 105 * mote.memory);
+    else fill(74, 82, 92, 32 + 35 * mote.memory);
+
+    circle(mote.x + sin((tick + mote.n) * .13) * mote.memory * 2, mote.y, r * 2);
+  }
+
+  const sample = bases.map(b => digitSum(tick, b).toString(b)).join(' · ');
+  readout.textContent = `tick ${tick.toString().padStart(6, '0')}  /  digit-sums ${sample}  /  amber marks are simultaneous carries`;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  background(7, 9, 12);
+  buildField();
+}
+</script>
+</body>
+</html>
