@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '102-remainder-reliquary', title: 'remainder reliquary', date: '2026-08-23' },
   { id: '101-gap-bell', title: 'gap bell', date: '2026-08-22' },
   { id: '100-crt-tidepool', title: 'crt tidepool', date: '2026-08-21' },
   { id: '099-odometer-fog', title: 'odometer fog', date: '2026-08-20' },

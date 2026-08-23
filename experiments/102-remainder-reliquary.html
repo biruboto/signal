@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>remainder reliquary</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #090b0b; color: #d7d4c7; }
+    canvas { display: block; }
+    #label { position: fixed; left: 24px; top: 20px; max-width: 310px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .035em; pointer-events: none; }
+    #label b { color: #e5c578; font-weight: 500; }
+    #readout { position: fixed; right: 24px; bottom: 20px; text-align: right; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9c9d92; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="label"><b>remainder reliquary</b><br>each vessel keeps only what the next division cannot carry.</div>
+  <div id="readout"></div>
+<script>
+let vessels = [], tick = 0, lastDeposit = 0;
+const moduli = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+const phi = (Math.sqrt(5) - 1) / 2;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  buildVessels();
+}
+
+function buildVessels() {
+  vessels = [];
+  const gap = Math.max(42, Math.min(78, width / 14));
+  const cols = Math.max(4, Math.floor((width - 56) / gap));
+  const rows = Math.max(3, Math.floor((height - 110) / gap));
+  const ox = (width - (cols - 1) * gap) / 2;
+  const oy = (height - (rows - 1) * gap) / 2 + 10;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const i = r * cols + c;
+    vessels.push({ x: ox + c * gap, y: oy + r * gap, m: moduli[i % moduli.length], value: 0, age: 99, memory: [] });
+  }
+}
+
+function draw() {
+  background(9, 11, 11, 42);
+  tick++;
+  if (tick - lastDeposit > 9) { deposit(); lastDeposit = tick; }
+  noStroke();
+  for (const v of vessels) drawVessel(v);
+  if (tick % 90 === 0) document.getElementById('readout').textContent =
+    'deposit ' + Math.floor(tick / 10) + '\n' + vessels.length + ' incompatible vessels';
+}
+
+function deposit() {
+  const n = Math.floor(tick / 10);
+  // A shared irrational clock visits every vessel, but each preserves a different remainder.
+  for (let i = 0; i < vessels.length; i++) {
+    const v = vessels[i];
+    const arrival = Math.floor((n + 1) * (i + 3) * phi * 1000) % (v.m * 9);
+    const remainder = arrival % v.m;
+    if (remainder !== v.value) {
+      v.memory.push(v.value);
+      if (v.memory.length > 5) v.memory.shift();
+      v.value = remainder;
+      v.age = 0;
+    }
+    v.age++;
+  }
+}
+
+function drawVessel(v) {
+  const q = v.value / (v.m - 1 || 1);
+  const pulse = exp(-v.age * 0.045);
+  const base = 7 + q * 17;
+  fill(19 + q * 22, 26 + q * 27, 25 + q * 17, 210);
+  circle(v.x, v.y, base * 2.15);
+  for (let j = 0; j < v.memory.length; j++) {
+    const a = (j / Math.max(1, v.memory.length)) * TWO_PI + tick * 0.004;
+    const d = base + 5 + j * 2;
+    fill(91, 108, 99, 24 + j * 8);
+    circle(v.x + cos(a) * d, v.y + sin(a) * d, 1.5 + j * .6);
+  }
+  fill(188 + 55 * pulse, 157 + 58 * q, 77 + 48 * q, 75 + 170 * pulse);
+  circle(v.x, v.y, 2.2 + 9 * pulse + q * 4);
+  if (pulse > .04) {
+    noFill(); stroke(225, 191, 105, pulse * 145); strokeWeight(1);
+    circle(v.x, v.y, base * 2 + pulse * 34);
+    noStroke();
+  }
+  fill(126, 132, 121, 120);
+  textAlign(CENTER, CENTER); textSize(9);
+  text(v.value, v.x, v.y + base + 12);
+}
+
+function mousePressed() { tick += 63; deposit(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); buildVessels(); }
+</script>
+</body>
+</html>
