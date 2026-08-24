@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>irrational tide</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; overflow:hidden; background:#07090d; color:#d8d1c0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #legend { position:fixed; left:22px; bottom:18px; z-index:2; font-size:11px; line-height:1.55; letter-spacing:.05em; color:#aaa393; user-select:none; }
+  #legend b { color:#e4a95c; font-weight:500; }
+  #readout { color:#777a78; }
+</style>
+</head>
+<body>
+<div id="legend"><b>IRRATIONAL TIDE</b><br><span id="readout"></span><br>each column waits for a different impossible return</div>
+<script>
+let t = 0, grain = [], columns = 0;
+const phi = (1 + Math.sqrt(5)) / 2;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+  buildGrain();
+  document.getElementById('readout').textContent = 'root clocks: ' + columns + '  ·  calibrating near-returns';
+}
+
+function buildGrain() {
+  columns = Math.max(24, Math.floor(width / 12));
+  grain = Array.from({length: columns}, (_, i) => {
+    const n = i + 2;
+    return { n, phase: (n * phi) % 1, rate: Math.sqrt(n) / phi, salt: (n * n * 17) % 101 };
+  });
+}
+
+function draw() {
+  background(7, 9, 13, 38);
+  const horizon = height * 0.57;
+  const span = width / columns;
+  const cycle = t * 0.0032;
+
+  // The tide line is the summed disagreement of root clocks.
+  for (let x = 0; x < width; x += 2) {
+    let q = x / width;
+    let wav = 0;
+    for (let k = 1; k < 6; k++) wav += sin(q * TWO_PI * k * phi + cycle * (k + 1)) / (k * 1.9);
+    let y = horizon + wav * height * 0.115;
+    fill(44, 69, 83, 35);
+    rect(x, y, 2, height - y);
+  }
+
+  grain.forEach((g, i) => {
+    const x = (i + .5) * span;
+    const r = (cycle * g.rate + g.phase) % 1;
+    const gate = 0.5 + 0.5 * sin(TWO_PI * (r + sin(cycle * .47 + g.n) * .11));
+    const y = horizon + (r - .5) * height * .70;
+    const nearReturn = Math.abs(r - .5);
+    const ember = Math.max(0, 1 - nearReturn * 17);
+
+    fill(54, 72, 77, 26 + gate * 34);
+    rect(x - .5, horizon - height*.28, 1, height*.56);
+    fill(102 + ember * 120, 123 + ember * 54, 106 - ember * 38, 90 + gate * 100);
+    ellipse(x, y, 1.5 + gate * 3.8, 1.5 + gate * 3.8);
+
+    if (ember > .04) {
+      fill(230, 159, 72, ember * 150);
+      ellipse(x, y, 2 + ember * 9, 2 + ember * 9);
+      fill(241, 193, 111, ember * 205);
+      rect(x - .5, horizon - height*.31, 1, height*.62);
+    }
+  });
+
+  fill(13, 16, 20, 95);
+  rect(0, 0, width, height * .12);
+  document.getElementById('readout').textContent =
+    'root clocks: ' + columns + '  ·  nearest almost-return: ' + nearestReturn().toFixed(5);
+  t++;
+}
+
+function nearestReturn() {
+  let nearest = 1;
+  for (const g of grain) {
+    const r = (t * .0032 * g.rate + g.phase) % 1;
+    nearest = Math.min(nearest, Math.abs(r - .5));
+  }
+  return nearest;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  buildGrain();
+}
+</script>
+</body>
+</html>
