@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>thue sluice</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; overflow:hidden; background:#080b0d; color:#d9d2bf; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  #legend { position:fixed; left:22px; bottom:18px; z-index:2; font-size:11px; line-height:1.55; letter-spacing:.05em; color:#999b91; user-select:none; }
+  #legend b { color:#e3ab5c; font-weight:500; }
+  #readout { color:#777f7a; }
+</style>
+</head>
+<body>
+<div id="legend"><b>THUE SLUICE</b><br><span id="readout"></span><br>an aperiodic word opens and closes the water</div>
+<script>
+let tick = 0, cols = 0, rows = 0;
+
+function bitParity(n) {
+  let p = 0;
+  while (n > 0) { p ^= (n & 1); n = n >>> 1; }
+  return p;
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+  measure();
+}
+
+function measure() {
+  cols = Math.max(18, Math.floor(width / 16));
+  rows = Math.max(18, Math.floor(height / 16));
+}
+
+function draw() {
+  background(8, 11, 13, 44);
+  const cw = width / cols, ch = height / rows;
+  const drift = Math.floor(tick / 5);
+  let open = 0, cuts = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // A skewed slice through the Thue-Morse word: no period is available to the sluice.
+      const n = ((r + drift) * 13 + c * 21 + ((c * r) % 17)) >>> 0;
+      const here = bitParity(n);
+      const above = bitParity((n - 13) >>> 0);
+      const left = bitParity((n - 21) >>> 0);
+      const x = c * cw, y = r * ch;
+      const pulse = .5 + .5 * sin(tick * .025 + c * .19 - r * .12);
+
+      if (here === 0) {
+        open++;
+        fill(20, 45, 52, 55 + pulse * 44);
+        rect(x + 1, y + 1, cw - 2, ch - 2);
+        if (above !== here) {
+          fill(75, 138, 140, 105 + pulse * 70);
+          rect(x + cw*.44, y, Math.max(1, cw*.12), ch);
+        }
+      } else {
+        fill(25, 29, 29, 70);
+        rect(x + 1, y + 1, cw - 2, ch - 2);
+        if (left !== here) {
+          cuts++;
+          fill(186, 112, 61, 48 + pulse * 75);
+          rect(x, y + ch*.46, cw, Math.max(1, ch*.09));
+        }
+      }
+
+      if (here !== above && left !== here) {
+        fill(238, 174, 84, 135 + pulse * 80);
+        ellipse(x + cw*.5, y + ch*.5, 1.5 + pulse*3, 1.5 + pulse*3);
+      }
+    }
+  }
+
+  fill(8, 11, 13, 120);
+  rect(0, 0, width, height*.11);
+  document.getElementById('readout').textContent =
+    'word offset: ' + drift + '  ·  open gates: ' + open + '  ·  discontinuities: ' + cuts;
+  tick++;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  measure();
+}
+</script>
+</body>
+</html>
