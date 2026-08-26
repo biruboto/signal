@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '105-ternary-wake', title: 'ternary wake', date: '2026-08-26' },
   { id: '104-thue-sluice', title: 'thue sluice', date: '2026-08-25' },
   { id: '103-irrational-tide', title: 'irrational tide', date: '2026-08-24' },
   { id: '102-remainder-reliquary', title: 'remainder reliquary', date: '2026-08-23' },

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ternary wake</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html,body{margin:0;overflow:hidden;background:#07090b;color:#c9d1ca;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+    #caption{position:fixed;left:22px;bottom:19px;letter-spacing:.08em;line-height:1.55;pointer-events:none;text-shadow:0 1px 8px #000}
+    #caption b{color:#edf2e8;font-weight:500} #caption span{color:#7f9187}
+    #hint{position:fixed;right:22px;bottom:20px;color:#718077;letter-spacing:.06em;pointer-events:none}
+  </style>
+</head>
+<body>
+  <div id="caption"><b>ternary wake</b><br><span id="readout"></span></div>
+  <div id="hint">click: disturb the carries</div>
+<script>
+let cells=[], cols, rows, step=0, disturbance=0;
+const palette = [[9,13,17],[53,79,72],[153,184,133],[233,214,151]];
+
+function setup(){
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+  build();
+}
+function build(){
+  const size = constrain(floor(min(width,height)/34), 11, 24);
+  cols = ceil(width/size)+2; rows = ceil(height/size)+2;
+  cells = Array.from({length:cols*rows}, (_,i)=> ({
+    v: (i*7 + floor(i/cols)*11) % 3,
+    echo: 0
+  }));
+}
+function trits(n){
+  let sum=0, place=1;
+  while(n){ sum += (n%3 - 1)*place; n=floor(n/3); place*=3; }
+  return sum;
+}
+function draw(){
+  background(7,9,11);
+  const t = floor(frameCount/7) + step;
+  const carry = trits(t + 1) - trits(t);
+  const size = width/(cols-2);
+  disturbance *= .976;
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    const i=y*cols+x, c=cells[i];
+    const phase = ((x*2-y*3+t) % 27 + 27) % 27;
+    const neighbor = cells[((y+rows-1)%rows)*cols + ((x+1)%cols)].v;
+    // A carry only changes a cell when its local ternary place agrees with the carry's sign.
+    if(phase===0 && ((carry>0 && c.v!==2) || (carry<0 && c.v!==0))) c.v=(c.v+(carry>0?1:2))%3;
+    if((x+y+t)%19===0 && neighbor===2) c.echo=1;
+    c.echo *= .93;
+    const wave = sin((x*.41-y*.27+t*.055) + c.v*2.1);
+    const ink = c.v + (c.echo>.18 ? 1:0);
+    const p=palette[constrain(ink,0,3)];
+    const a = 0.17 + 0.33*(wave*.5+.5) + c.echo*.25;
+    fill(p[0],p[1],p[2],255*a);
+    const wobble = sin(t*.03+y*.72)*1.8;
+    rect((x-1)*size+wobble,(y-1)*size,size+1,size+1);
+  }
+  // The moving horizon is the only direct trace of the counter.
+  const hy = height*.5 + sin(t*.021)*height*.22;
+  fill(226,226,196,42); rect(0,hy,width,1);
+  document.getElementById('readout').textContent =
+    'counter ' + (t).toString(3).padStart(8,'0') + '  ·  carry ' + (carry>0?'rising':'falling') + '  ·  ' + round(disturbance) + ' loose grains';
+}
+function mousePressed(){
+  const cx=floor(mouseX/(width/(cols-2)))+1, cy=floor(mouseY/(width/(cols-2)))+1;
+  for(let y=-4;y<=4;y++) for(let x=-4;x<=4;x++){
+    const xx=(cx+x+cols)%cols, yy=(cy+y+rows)%rows, d=sqrt(x*x+y*y);
+    if(d<4.5){ const c=cells[yy*cols+xx]; c.v=(c.v+1+floor(d))%3; c.echo=1; disturbance++; }
+  }
+  step += 9;
+}
+function windowResized(){ resizeCanvas(windowWidth,windowHeight); build(); }
+</script>
+</body>
+</html>
