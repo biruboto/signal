@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zeckendorf weather</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#070b0d;color:#cbd4cc;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+  #readout{position:fixed;left:18px;bottom:16px;letter-spacing:.08em;line-height:1.7;pointer-events:none;opacity:.82}
+  #title{position:fixed;right:18px;top:16px;letter-spacing:.13em;color:#aabbb0;pointer-events:none}
+  #hint{position:fixed;right:18px;bottom:16px;color:#718078;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="title">ZECKENDORF WEATHER</div><div id="readout"></div><div id="hint">click: introduce a number</div>
+<script>
+let fib=[], cols=0, rows=0, field=[], tick=0, offered=0;
+function setup(){createCanvas(windowWidth,windowHeight); pixelDensity(1); build(); background(7,11,13);}
+function build(){
+  fib=[1,2]; while(fib[fib.length-1]<10000000) fib.push(fib[fib.length-1]+fib[fib.length-2]);
+  cols=max(20,floor(width/13)); rows=max(12,floor(height/13));
+  field=Array.from({length:rows},()=>Array(cols).fill(0));
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) field[y][x]=random()<.055?1:0;
+}
+function digits(n){
+  let d=Array(fib.length).fill(0);
+  for(let i=fib.length-1;i>=0;i--) if(fib[i]<=n){d[i]=1;n-=fib[i];}
+  return d;
+}
+function draw(){
+  background(7,11,13,42); tick++;
+  let next=Array.from({length:rows},()=>Array(cols).fill(0));
+  let wind=digits(floor((frameCount*17+offered)%fib[fib.length-1]));
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    let source=field[y][x];
+    let phase=wind[(x+y*2+floor(frameCount/9))%wind.length];
+    let n=(field[(y+rows-1)%rows][x]+field[(y+1)%rows][x]+field[y][(x+cols-1)%cols]+field[y][(x+1)%cols]);
+    next[y][x]=source ? (phase||n===2?1:0) : ((phase&&n===1)||(n===3)?1:0);
+  }
+  field=next;
+  noStroke();
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(field[y][x]){
+    let k=(x*3+y+floor(frameCount/7))%wind.length;
+    let a=65+150*wind[k];
+    fill(128,184,153,a); rect(x*width/cols,y*height/rows,width/cols-1,height/rows-1);
+    if(wind[(k+5)%wind.length]) {fill(210,172,107,45);rect(x*width/cols+2,y*height/rows+2,2,2);}
+  }
+  let mass=field.flat().reduce((a,b)=>a+b,0), word=wind.slice(0,18).reverse().join('');
+  document.querySelector('#readout').textContent=`offered: ${offered||'ambient'}\ncanonical wind: ${word}\noccupied cells: ${mass}`;
+}
+function mousePressed(){offered=floor(map(mouseX,0,width,1,999999)+map(mouseY,0,height,0,999999)); let d=digits(offered); for(let i=0;i<d.length;i++) if(d[i]){
+  let x=(i*7+floor(mouseX/13))%cols, y=(i*11+floor(mouseY/13))%rows; field[y][x]=1;
+}}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+</script>
+</body></html>
