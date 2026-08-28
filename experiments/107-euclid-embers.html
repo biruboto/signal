@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>euclid embers</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #07090b; color: #d9d5c9; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #readout { position: fixed; left: 18px; top: 16px; letter-spacing: .08em; opacity: .8; pointer-events: none; }
+  .caption { position: fixed; right: 18px; bottom: 16px; text-align: right; line-height: 1.55; color: #9e9b91; pointer-events: none; }
+  b { color: #e7b96d; font-weight: normal; }
+</style>
+</head>
+<body>
+<div id="readout"></div>
+<div class="caption">each ember divides itself by subtraction<br><b>click</b> to change the initial hoard</div>
+<script>
+let embers = [], cycle = 0, readout;
+const palette = [[235,129,73],[226,185,92],[111,177,181],[179,107,162]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  colorMode(RGB, 255, 255, 255, 255);
+  background(7, 9, 11);
+  readout = document.getElementById('readout');
+  seedEmbers();
+}
+
+function seedEmbers() {
+  embers = [];
+  const n = Math.max(90, Math.floor(width * height / 9000));
+  for (let i = 0; i < n; i++) embers.push(makeEmber());
+  cycle++;
+}
+
+function makeEmber() {
+  const a = floor(random(34, 987));
+  const b = floor(random(21, 610));
+  return { a, b, x: random(width), y: random(height), vx: random(-.22,.22), vy: random(-.22,.22), age: 0, trace: 0, hue: floor(random(palette.length)) };
+}
+
+function draw() {
+  noStroke(); fill(7, 9, 11, 15); rect(0, 0, width, height);
+  let remaining = 0, quotientSum = 0;
+  for (const e of embers) {
+    if (e.a === e.b) { respawn(e); continue; }
+    const large = max(e.a, e.b), small = min(e.a, e.b);
+    const q = floor(large / small);
+    if (e.a > e.b) e.a -= e.b; else e.b -= e.a;
+    e.age++; e.trace += q; quotientSum += q; remaining++;
+    e.x += e.vx + sin(frameCount*.012 + e.trace)*.18;
+    e.y += e.vy + cos(frameCount*.009 + e.age)*.18;
+    if (e.x < 0 || e.x > width) e.vx *= -1;
+    if (e.y < 0 || e.y > height) e.vy *= -1;
+    e.x = constrain(e.x, 0, width); e.y = constrain(e.y, 0, height);
+    const c = palette[e.hue], r = 1 + min(4, q*.65);
+    fill(c[0],c[1],c[2], 24 + min(130, q*30)); circle(e.x, e.y, r);
+    if (q > 2) { fill(c[0],c[1],c[2], 18); circle(e.x, e.y, r * (3 + q)); }
+  }
+  readout.textContent = `EUCLID EMBERS  /  hoard ${cycle.toString().padStart(2,'0')}  /  unresolved ${remaining}  /  quotient weather ${quotientSum}`;
+}
+
+function respawn(e) { Object.assign(e, makeEmber()); }
+function mousePressed() { background(7,9,11); seedEmbers(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); background(7,9,11); seedEmbers(); }
+</script>
+</body>
+</html>
