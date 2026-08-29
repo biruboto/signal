@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>quadratic undertow</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+*{box-sizing:border-box} html,body{margin:0;overflow:hidden;background:#07090d;color:#d7d9d2;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+#readout{position:fixed;left:18px;top:16px;letter-spacing:.08em;opacity:.82;pointer-events:none}.caption{position:fixed;right:18px;bottom:16px;text-align:right;line-height:1.55;color:#9ca0a0;pointer-events:none}b{font-weight:normal;color:#9fd6c7}
+</style>
+</head>
+<body>
+<div id="readout"></div><div class="caption">two primes test the same drifting numbers<br><b>click</b> to choose another pair</div>
+<script>
+let grains=[], pairIndex=0, readout, fieldTick=0;
+const pairs=[[47,59],[43,71],[61,73],[67,83],[79,89],[53,97]];
+const ink=[[102,191,180],[207,151,93],[155,125,205]];
+function legendre(a,p){a=((a%p)+p)%p;if(a===0)return 0;let v=1,b=a;let n=(p-1)/2;while(n){if(n&1)v=(v*b)%p;b=(b*b)%p;n=Math.floor(n/2)}return v===1?1:-1}
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);readout=document.getElementById('readout');background(7,9,13);seed()}
+function seed(){grains=[];let n=Math.max(180,Math.floor(width*height/4200));for(let i=0;i<n;i++)grains.push({x:random(width),y:random(height),a:floor(random(1,9997)),dx:random(-.35,.35),dy:random(-.35,.35),trail:random(20,90),age:floor(random(200))});fieldTick=0;background(7,9,13)}
+function draw(){noStroke();fill(7,9,13,19);rect(0,0,width,height);const [p,q]=pairs[pairIndex];let accord=0, split=0, nulls=0;for(const g of grains){let n=(g.a+fieldTick)%10007;let lp=legendre(n,p),lq=legendre(n,q);if(lp===0||lq===0)nulls++;else if(lp===lq)accord++;else split++;let kind=lp===0||lq===0?2:(lp===lq?0:1);let c=ink[kind];let turn=(lp-lq)*.08;g.dx+=sin(n*.017+g.age*.03)*.006+turn*.016;g.dy+=cos(n*.013-g.age*.02)*.006-turn*.016;let speed=kind===0?.76:1.18;g.x+=g.dx*speed;g.y+=g.dy*speed;if(g.x<0||g.x>width)g.dx*=-1;if(g.y<0||g.y>height)g.dy*=-1;g.x=constrain(g.x,0,width);g.y=constrain(g.y,0,height);let alpha=kind===0?72:kind===1?46:155;fill(c[0],c[1],c[2],alpha);circle(g.x,g.y,kind===2?3.2:1.7);if(kind===2){fill(c[0],c[1],c[2],20);circle(g.x,g.y,13)}g.a=(g.a+1+(lp===lq?0:1))%10007;g.age++}fieldTick=(fieldTick+1)%10007;readout.textContent=`QUADRATIC UNDERTOW  /  primes ${p} · ${q}  /  accord ${accord}  split ${split}  singular ${nulls}`}
+function mousePressed(){pairIndex=(pairIndex+1)%pairs.length;seed()}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);seed()}
+</script>
+</body></html>

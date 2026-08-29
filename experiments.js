@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '108-quadratic-undertow', title: 'quadratic undertow', date: '2026-08-29' },
   { id: '107-euclid-embers', title: 'euclid embers', date: '2026-08-28' },
   { id: '106-zeckendorf-weather', title: 'zeckendorf weather', date: '2026-08-27' },
   { id: '105-ternary-wake', title: 'ternary wake', date: '2026-08-26' },
