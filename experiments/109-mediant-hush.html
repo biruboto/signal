@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mediant hush</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#08100e;color:#d9e8dc;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  #caption{position:fixed;left:22px;bottom:19px;z-index:2;font-size:11px;letter-spacing:.12em;line-height:1.65;color:#a9c2ad;pointer-events:none}
+  #caption b{font-weight:500;color:#e3efe5}
+</style>
+</head>
+<body>
+<div id="caption"><b>MEDIANT HUSH</b><br><span id="readout"></span><br>click to reseed the interval</div>
+<script>
+let cols, rows, cell, field, nextField, generation=0, p=13, q=29;
+const palette=['#08100e','#142b25','#2d5949','#67a77e','#d0cc82'];
+
+function setup(){
+  createCanvas(windowWidth,windowHeight);
+  pixelDensity(1);
+  initialize();
+}
+function initialize(){
+  cell=max(5, floor(min(width,height)/105));
+  cols=ceil(width/cell); rows=ceil(height/cell);
+  field=Array.from({length:rows},(_,y)=>Array.from({length:cols},(_,x)=>{
+    // A narrow irrational cut, recorded as binary sediment.
+    let r=(x*34+y*21+7)%89;
+    return (r===0 || (x*13+y*29)%233===0) ? 3 : 0;
+  }));
+  generation=0;
+}
+function draw(){
+  background(palette[0]);
+  noStroke();
+  // The denominator pair walks through Farey neighbors; its mediant is the daily gate.
+  const a=1+(generation%31), b=2+((generation*7)%37);
+  const m=a+b;
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    let v=field[y][x];
+    if(v){
+      fill(palette[v]);
+      rect(x*cell,y*cell,cell+0.45,cell+0.45);
+    }
+  }
+  if(frameCount%3===0) evolve(a,b,m);
+  generation++;
+  document.getElementById('readout').textContent=
+    'gate  '+a+'/'+b+'  →  '+m+'    |    layer '+generation;
+}
+function evolve(a,b,m){
+  nextField=Array.from({length:rows},()=>Array(cols).fill(0));
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    let n=0, weighted=0;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(dx===0&&dy===0)continue;
+      let v=field[(y+dy+rows)%rows][(x+dx+cols)%cols];
+      if(v){n++;weighted+=v;}
+    }
+    let old=field[y][x];
+    // Ordinary local pressure is interrupted by a moving mediant congruence.
+    let gate=((x*a+y*b+generation)%m===0);
+    if(old){
+      if(n===2||n===3) nextField[y][x]=min(4,old+(gate?1:0));
+      else if(gate && n>=1) nextField[y][x]=1;
+    } else if(n===3 || (gate && n===2 && weighted%2===0)) {
+      nextField[y][x]=gate?3:1;
+    }
+  }
+  field=nextField;
+}
+function mousePressed(){
+  p=3+floor(random(31)); q=5+floor(random(41));
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    let d=dist(x*cell,y*cell,mouseX,mouseY)/cell;
+    if(d<18 && random()<.22*(1-d/18)) field[y][x]=floor(random(1,4));
+  }
+  generation=0;
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);initialize();}
+</script>
+</body>
+</html>
