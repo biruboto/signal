@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>binomial mire</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#080b10;color:#dce4df;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  #caption{position:fixed;left:22px;bottom:19px;z-index:2;font-size:11px;letter-spacing:.12em;line-height:1.65;color:#9eafb0;pointer-events:none}
+  #caption b{font-weight:500;color:#dce9e4}
+</style>
+</head>
+<body>
+<div id="caption"><b>BINOMIAL MIRE</b><br><span id="readout"></span><br>click to move the modulus</div>
+<script>
+let cell, cols, rows, residue=[], modulus=7, drift=0;
+const ink=['#080b10','#13232b','#1e4850','#4e7a71','#bd9d65','#e1ddd0'];
+
+function setup(){
+  createCanvas(windowWidth,windowHeight);
+  pixelDensity(1);
+  initialize();
+}
+function initialize(){
+  cell=max(4,floor(min(width,height)/130));
+  cols=ceil(width/cell)+2; rows=ceil(height/cell)+2;
+  residue=Array.from({length:rows},()=>Array(cols).fill(0));
+  // Pascal's triangle, folded sideways; each row inherits two imperfect memories.
+  for(let y=0;y<rows;y++){
+    residue[y][0]=1;
+    for(let x=1;x<=y && x<cols;x++) residue[y][x]=(residue[y-1][x-1]+residue[y-1][x])%210;
+  }
+}
+function draw(){
+  background(ink[0]);
+  noStroke();
+  const tide=floor(frameCount/9);
+  const seam=(tide+drift)%modulus;
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    let source=residue[y][x];
+    if(!source) continue;
+    // The triangle is sampled through a mobile congruence, turning addition into wetlands.
+    let r=(source + x*3 + y*5 + tide)%modulus;
+    let level=(r===seam)?5:(r===0?4:(r===1?3:(r===2?2:0)));
+    if(level){
+      let xx=(x-y*.48)*cell + width*.31;
+      let yy=y*cell - (x%2)*cell*.16;
+      fill(ink[level]);
+      rect(xx,yy,cell+0.7,cell+0.7);
+    }
+  }
+  document.getElementById('readout').textContent='modulus '+modulus+'   |   seam '+seam+'   |   inherited row '+tide;
+}
+function mousePressed(){
+  const choices=[5,7,11,13,17,19];
+  modulus=choices[(choices.indexOf(modulus)+1)%choices.length];
+  drift=floor(random(modulus));
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);initialize();}
+</script>
+</body>
+</html>
