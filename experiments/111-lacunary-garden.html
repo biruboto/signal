@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>lacunary garden</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #070a0b; color: #c9d0c4; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #readout { position: fixed; left: 18px; bottom: 17px; max-width: min(540px, calc(100vw - 36px)); font-size: 11px; line-height: 1.5; letter-spacing: .055em; color: rgba(211, 220, 203, .73); pointer-events: none; }
+    #mark { position: fixed; right: 18px; top: 15px; font-size: 10px; letter-spacing: .14em; color: rgba(211, 220, 203, .42); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="mark">111 / LACUNARY GARDEN</div>
+  <div id="readout"></div>
+<script>
+let seed = 1777;
+let phase = 0;
+let scaleUnit = 14;
+let readout;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  colorMode(HSB, 360, 100, 100, 100);
+  readout = document.getElementById('readout');
+  noStroke();
+}
+
+function hash(n) {
+  n = Math.sin(n * 12.9898 + seed * 0.001) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+// A sum with exponentially widening gaps: nearby cells share early bits,
+// distant cells negotiate only their rarer digits.
+function lacunary(x, y, t) {
+  let sum = 0;
+  let weight = 0.52;
+  for (let k = 0; k < 8; k++) {
+    const gap = Math.pow(2, k) * scaleUnit;
+    const ix = Math.floor(x / gap);
+    const iy = Math.floor(y / gap);
+    const bit = ((ix * 3 + iy * 5 + k * 7) & 1) ? 1 : -1;
+    const tilt = Math.sin((ix - iy) * 0.43 + t * (0.13 + k * 0.017) + hash(ix * 31 + iy * 17 + k) * 6.28);
+    sum += bit * tilt * weight;
+    weight *= 0.67;
+  }
+  return sum;
+}
+
+function draw() {
+  background(202, 28, 4, 13);
+  const cell = Math.max(5, Math.floor(Math.min(width, height) / 105));
+  const t = phase * 0.006;
+  let crossings = 0;
+  for (let y = 0; y < height + cell; y += cell) {
+    for (let x = 0; x < width + cell; x += cell) {
+      const a = lacunary(x, y, t);
+      const b = lacunary(x + cell, y + cell, t);
+      const edge = Math.abs(a - b);
+      const glow = constrain((edge - 0.09) * 170, 0, 72);
+      const basin = constrain(10 + (a + 1.5) * 20, 0, 47);
+      if (a * b < 0) crossings++;
+      const hue = 155 + a * 62 + Math.sin(t + x * 0.004) * 12;
+      fill(hue, 38 + glow * 0.6, basin + glow, 58 + glow * 0.5);
+      rect(x, y, cell + 0.6, cell + 0.6);
+    }
+  }
+  // Slow shared drift makes the static arithmetic appear to cultivate itself.
+  phase++;
+  readout.textContent = `eight gaps are voting · ${crossings} local treaties · seed ${seed} · click to change the soil`;
+}
+
+function mousePressed() {
+  seed = Math.floor((mouseX + 1) * 7919 + (mouseY + 1) * 104729 + millis());
+  phase = 0;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
