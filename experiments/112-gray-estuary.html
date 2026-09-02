@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gray estuary</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #05090c; color: #c7d3ca; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #readout { position: fixed; left: 18px; bottom: 17px; max-width: min(560px, calc(100vw - 36px)); font-size: 11px; line-height: 1.5; letter-spacing: .055em; color: rgba(208, 222, 210, .72); pointer-events: none; }
+    #mark { position: fixed; right: 18px; top: 15px; font-size: 10px; letter-spacing: .14em; color: rgba(208, 222, 210, .42); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="mark">112 / GRAY ESTUARY</div>
+  <div id="readout"></div>
+<script>
+let clock = 0;
+let offset = 0;
+let readout;
+const bits = 12;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  colorMode(HSB, 360, 100, 100, 100);
+  readout = document.getElementById('readout');
+  noStroke();
+}
+
+function gray(n) { return n ^ (n >> 1); }
+function popcount(n) { let c = 0; while (n) { n &= n - 1; c++; } return c; }
+function valuation(n) { let v = 0; while (n && !(n & 1)) { n >>= 1; v++; } return v; }
+
+function draw() {
+  background(205, 43, 4);
+  const cell = Math.max(7, Math.floor(Math.min(width, height) / 86));
+  const cols = Math.ceil(width / cell) + 2;
+  const rows = Math.ceil(height / cell) + 2;
+  const now = Math.floor(clock / 3) + offset;
+  let deepest = 0;
+  let spill = 0;
+
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      // The address is read in Gray code: neighboring moments differ by one bit only.
+      const address = (gx + gy * cols + now) & ((1 << bits) - 1);
+      const word = gray(address);
+      const previous = gray((address - 1) & ((1 << bits) - 1));
+      const changed = word ^ previous;
+      const depth = valuation(changed);
+      deepest = Math.max(deepest, depth);
+      const weight = popcount(word);
+      const diagonal = ((gx * 5 - gy * 3 + (word >> 2)) & 15) / 15;
+      const bank = 9 + weight * 2.7 + depth * 6;
+      const isChannel = (word & 31) === 0 || (changed & 15) === 0;
+      if (isChannel) spill++;
+      const hue = isChannel ? 185 + depth * 11 : 128 + diagonal * 34 + depth * 4;
+      const sat = isChannel ? 52 : 30 + weight * 3;
+      const bri = isChannel ? 35 + depth * 8 : bank;
+      const alpha = isChannel ? 72 : 62;
+      fill(hue, sat, bri, alpha);
+      rect(gx * cell, gy * cell, cell + 0.7, cell + 0.7);
+      if (changed && depth >= 4) {
+        fill(48 + depth * 8, 50, 78, 32);
+        rect(gx * cell + cell * .22, gy * cell + cell * .22, cell * .56, cell * .56);
+      }
+    }
+  }
+  clock++;
+  readout.textContent = `one bit changes per arrival · deepest turn: ${deepest} · ${spill} channels holding open · click to displace the inlet`;
+}
+
+function mousePressed() {
+  offset = (offset + Math.floor(mouseX * 31 + mouseY * 17 + millis())) & ((1 << bits) - 1);
+  clock = 0;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
