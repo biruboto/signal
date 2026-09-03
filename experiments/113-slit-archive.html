@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>slit archive</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #070908; color: #d7d5c8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  canvas { display: block; }
+  #readout { position: fixed; left: 22px; bottom: 19px; font-size: 11px; letter-spacing: .12em; color: #a6aaa0; pointer-events: none; }
+  .caption { position: fixed; right: 22px; bottom: 19px; max-width: 330px; text-align: right; font-size: 10px; line-height: 1.5; letter-spacing: .1em; color: #777c72; pointer-events: none; }
+  #hint { position: fixed; left: 22px; top: 18px; font-size: 10px; letter-spacing: .14em; color: #777c72; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hint">SLIT ARCHIVE / click to re-seed</div>
+<div id="readout"></div>
+<div class="caption">a finite alphabet enters through one narrow seam.<br>every return is filed under a different remainder.</div>
+<script>
+let strips = [], phase = 0, serial = 1;
+const palette = ['#c7d64a', '#9abfa3', '#5e8f86', '#d6a95d', '#c75d43', '#8270a8'];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  seedArchive();
+}
+
+function seedArchive() {
+  randomSeed(serial * 7919);
+  noiseSeed(serial * 7919);
+  strips = [];
+  const n = constrain(floor(width / 15), 36, 110);
+  for (let i = 0; i < n; i++) {
+    const q = 3 + (i * 7 + floor(random(0, 5))) % 17;
+    strips.push({
+      x: (i + .5) / n,
+      q, residue: floor(random(q)),
+      depth: random(.25, 1),
+      drift: random(-.004, .004),
+      color: palette[(i * 3 + q) % palette.length],
+      marks: Array.from({length: 42}, (_, k) => (k * k + i * 5 + q) % q)
+    });
+  }
+  phase = random(1000);
+}
+
+function draw() {
+  background(7, 9, 8);
+  const horizon = height * .52;
+  const slitX = width * .5 + sin(frameCount * .004) * width * .11;
+
+  noStroke();
+  for (let y = 0; y < height; y += 3) {
+    const v = map(y, 0, height, 16, 3);
+    fill(8, v + 3, 8, 110);
+    rect(0, y, width, 2);
+  }
+
+  // The seam is a clock: only residues matching its moving index receive ink.
+  for (let i = 0; i < strips.length; i++) {
+    const s = strips[i];
+    const x = s.x * width;
+    const local = floor((frameCount * .16 + i * 2.618) % s.q);
+    const admitted = local === s.residue;
+    const pull = admitted ? 1 : .16;
+    const lean = (slitX - x) * .045 * s.depth;
+    const top = horizon - height * .37 * s.depth;
+    const bottom = horizon + height * .39 * s.depth;
+
+    stroke(s.color + (admitted ? 'c8' : '24'));
+    strokeWeight(admitted ? 1.45 : .55);
+    line(x + lean, top, x - lean, bottom);
+
+    for (let k = 0; k < s.marks.length; k++) {
+      const m = s.marks[k];
+      if (m !== local && !admitted) continue;
+      const yy = top + (bottom - top) * (k / (s.marks.length - 1));
+      const beat = sin(phase + i * .71 + k * 1.91);
+      const len = (admitted ? 12 + 18 * s.depth : 3) * (0.55 + .45 * beat * beat);
+      stroke(s.color + (admitted ? 'd8' : '38'));
+      strokeWeight(admitted ? 1 : .45);
+      line(x + lean - len, yy, x + lean + len * .32, yy);
+    }
+  }
+
+  stroke(214, 222, 184, 105);
+  strokeWeight(.7);
+  line(slitX, height * .11, slitX, height * .89);
+  noStroke();
+  fill(214, 222, 184, 160);
+  rect(slitX - 1.5, horizon - 7, 3, 14);
+
+  const active = strips.filter((s, i) => floor((frameCount * .16 + i * 2.618) % s.q) === s.residue).length;
+  document.getElementById('readout').textContent = `SEAM ${serial.toString().padStart(3, '0')}  ·  ${active} ADMISSIONS  ·  FRAME ${frameCount}`;
+}
+
+function mousePressed() { serial++; seedArchive(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); seedArchive(); }
+</script>
+</body>
+</html>

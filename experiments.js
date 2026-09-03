@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '113-slit-archive', title: 'slit archive', date: '2026-09-03' },
   { id: '112-gray-estuary', title: 'gray estuary', date: '2026-09-02' },
   { id: '111-lacunary-garden', title: 'lacunary garden', date: '2026-09-01' },
   { id: '110-binomial-mire', title: 'binomial mire', date: '2026-08-31' },
