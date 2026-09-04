@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>absence weir</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #080b0d; color: #d8ddd3; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  canvas { display: block; }
+  #hint { position: fixed; left: 22px; top: 18px; color: #788786; font-size: 10px; letter-spacing: .14em; pointer-events: none; }
+  #readout { position: fixed; left: 22px; bottom: 19px; color: #aebbb4; font-size: 11px; letter-spacing: .1em; pointer-events: none; }
+  .caption { position: fixed; right: 22px; bottom: 19px; max-width: 330px; text-align: right; color: #77827f; font-size: 10px; line-height: 1.55; letter-spacing: .09em; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hint">ABSENCE WEIR / click to change the gates</div>
+<div id="readout"></div>
+<div class="caption">several clocks send water through the same bed.<br>when two agree, the bed remembers what did not pass.</div>
+<script>
+let channels = [], seed = 1, tick = 0;
+const inks = ['#b9d752', '#74bfc1', '#c78355', '#a88bd2', '#e0cf8b'];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  makeWeir();
+}
+
+function makeWeir() {
+  randomSeed(seed * 10007);
+  channels = [];
+  const count = constrain(floor(height / 36), 11, 26);
+  for (let i = 0; i < count; i++) {
+    const a = 5 + (i * 3 + floor(random(4))) % 13;
+    const b = 7 + (i * 5 + floor(random(5))) % 17;
+    const c = 11 + (i * 7 + floor(random(6))) % 19;
+    channels.push({ a, b, c, offset: floor(random(0, 97)), ink: inks[i % inks.length], scars: [] });
+  }
+  tick = 0;
+}
+
+function draw() {
+  background(8, 11, 13);
+  const left = width * .1, right = width * .9;
+  const gap = height / (channels.length + 1);
+  const pace = max(1, floor(frameCount / 5));
+  let closures = 0;
+
+  noStroke();
+  for (let y = 0; y < height; y += 4) {
+    fill(10, 15 + (y / height) * 8, 17, 45);
+    rect(0, y, width, 2);
+  }
+
+  channels.forEach((ch, i) => {
+    const y = (i + 1) * gap;
+    const t = pace + ch.offset;
+    const p = t % ch.a, q = t % ch.b, r = t % ch.c;
+    const paired = (p === 0) + (q === 0) + (r === 0);
+    const closed = paired >= 2;
+    if (closed) {
+      closures++;
+      ch.scars.push({ x: map((t * 0.618) % 997, 0, 997, left, right), life: 1 });
+      if (ch.scars.length > 28) ch.scars.shift();
+    }
+
+    stroke(75, 92, 93, 90);
+    strokeWeight(.7);
+    line(left, y, right, y);
+
+    // Each period makes a moving tributary. Agreement is a deletion, not a brighter event.
+    for (let k = 0; k < 3; k++) {
+      const period = [ch.a, ch.b, ch.c][k];
+      const residue = [p, q, r][k];
+      const x = map(residue / period, 0, 1, left, right);
+      const span = 13 + 34 * (1 - residue / period);
+      stroke(ch.ink + (closed ? '22' : 'a8'));
+      strokeWeight(closed ? .55 : 1.25);
+      line(x - span, y - 5 + k * 5, x + span, y - 5 + k * 5);
+    }
+
+    ch.scars.forEach(s => {
+      s.life *= .988;
+      stroke(220, 232, 213, 165 * s.life);
+      strokeWeight(1.1);
+      line(s.x, y - 10, s.x, y + 10);
+      stroke(ch.ink + '55');
+      line(s.x - 9, y, s.x + 9, y);
+    });
+
+    if (closed) {
+      noStroke();
+      fill(8, 11, 13, 230);
+      rect(left, y - 12, right - left, 24);
+      stroke(221, 233, 211, 135);
+      strokeWeight(.8);
+      line(left, y, right, y);
+    }
+  });
+
+  stroke(186, 206, 194, 80);
+  strokeWeight(.65);
+  line(left, gap * .42, left, height - gap * .42);
+  line(right, gap * .42, right, height - gap * .42);
+  document.getElementById('readout').textContent = `TICK ${pace.toString().padStart(5, '0')}  ·  ${closures} GATES CLOSED  ·  ${channels.length} BEDS`;
+}
+
+function mousePressed() { seed++; makeWeir(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); makeWeir(); }
+</script>
+</body>
+</html>
