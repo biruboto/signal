@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mirror quarantine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #080b10; color: #d7ddd4; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  canvas { display: block; }
+  #hint { position: fixed; top: 18px; left: 22px; font-size: 10px; letter-spacing: .14em; color: #7e898c; pointer-events: none; }
+  #readout { position: fixed; bottom: 19px; left: 22px; font-size: 11px; letter-spacing: .1em; color: #b3beb7; pointer-events: none; }
+  .caption { position: fixed; right: 22px; bottom: 19px; max-width: 310px; text-align: right; font-size: 10px; line-height: 1.55; letter-spacing: .09em; color: #78847d; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hint">MIRROR QUARANTINE / click to alter the law</div>
+<div id="readout"></div>
+<div class="caption">a rule may travel only when its neighborhood cannot be read backward.<br>symmetry is not destroyed; it is held aside.</div>
+<script>
+let rows = [], rule = 110, phase = 0, columns = 0, maxRows = 0;
+const palette = ['#b7d85a', '#77c9cb', '#dc9861', '#c592d4', '#e3d78c'];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  resetField();
+}
+
+function resetField() {
+  columns = constrain(floor(width / 8), 54, 180);
+  maxRows = constrain(floor(height / 8), 42, 110);
+  rows = [];
+  const first = Array(columns).fill(0);
+  for (let i = 0; i < columns; i++) {
+    // Two incommensurate rhythms leave a sparse initial seam.
+    first[i] = ((i * 17 + rule) % 29 === 0 || (i * 11 + rule) % 47 === 0) ? 1 : 0;
+  }
+  rows.push(first);
+  phase = 0;
+}
+
+function nextRow(previous) {
+  const out = Array(columns).fill(0);
+  for (let i = 0; i < columns; i++) {
+    const l2 = previous[(i - 2 + columns) % columns];
+    const l = previous[(i - 1 + columns) % columns];
+    const c = previous[i];
+    const r = previous[(i + 1) % columns];
+    const r2 = previous[(i + 2) % columns];
+    const word = (l2 << 4) | (l << 3) | (c << 2) | (r << 1) | r2;
+    const reverse = (r2 << 4) | (r << 3) | (c << 2) | (l << 1) | l2;
+    const asymmetric = word !== reverse;
+    const bit = (rule >> (word % 8)) & 1;
+    // Only asymmetric five-cell witnesses may carry the elementary rule onward.
+    out[i] = asymmetric ? bit : 0;
+  }
+  return out;
+}
+
+function draw() {
+  background(8, 11, 16);
+  if (frameCount % 3 === 0) {
+    rows.push(nextRow(rows[rows.length - 1]));
+    if (rows.length > maxRows) rows.shift();
+    phase++;
+  }
+  const cellW = width / columns;
+  const cellH = height / maxRows;
+  let held = 0, live = 0;
+  noStroke();
+  for (let y = 0; y < rows.length; y++) {
+    const row = rows[y];
+    const prior = y ? rows[y - 1] : row;
+    for (let x = 0; x < columns; x++) {
+      const l2 = prior[(x - 2 + columns) % columns], l = prior[(x - 1 + columns) % columns];
+      const c = prior[x], r = prior[(x + 1) % columns], r2 = prior[(x + 2) % columns];
+      const mirrored = ((l2 << 4) | (l << 3) | (c << 2) | (r << 1) | r2) === ((r2 << 4) | (r << 3) | (c << 2) | (l << 1) | l2);
+      const yy = height - (rows.length - y) * cellH;
+      if (row[x]) {
+        live++;
+        fill(palette[(x + y + rule) % palette.length] + 'c8');
+        rect(x * cellW + .6, yy + .6, max(1, cellW - 1.2), max(1, cellH - 1.2));
+      } else if (mirrored && y > 0 && (x + y * 3) % 5 === 0) {
+        held++;
+        fill(118, 132, 136, 21);
+        rect(x * cellW + 1.4, yy + 1.4, max(1, cellW - 2.8), max(1, cellH - 2.8));
+      }
+    }
+  }
+  stroke(170, 190, 183, 44);
+  strokeWeight(.7);
+  line(18, height - rows.length * cellH - 9, width - 18, height - rows.length * cellH - 9);
+  document.getElementById('readout').textContent = `LAW ${rule.toString().padStart(3, '0')}  ·  ${phase.toString().padStart(4, '0')} PASSES  ·  ${live} TRAVELING  ·  ${held} HELD`;
+}
+
+function mousePressed() {
+  rule = (rule * 73 + 41) % 256;
+  resetField();
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); resetField(); }
+</script>
+</body>
+</html>
