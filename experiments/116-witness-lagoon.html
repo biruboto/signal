@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>witness lagoon</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #071112; color: #c7d6cf; }
+  canvas { display: block; }
+  #caption { position: fixed; left: 22px; bottom: 18px; max-width: 360px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(202,225,214,.58); pointer-events: none; }
+  #caption b { color: rgba(225,244,233,.88); font-weight: 500; }
+  #readout { position: fixed; right: 22px; top: 18px; text-align: right; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .09em; color: rgba(202,225,214,.48); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="readout"></div>
+<div id="caption"><b>WITNESS LAGOON</b><br>three little clocks testify about each place.<br>the places with one dissenting witness keep the light.</div>
+<script>
+let tick = 0;
+const primes = [17, 23, 29];
+const inks = [[69, 209, 182], [114, 151, 255], [239, 201, 99]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  noStroke();
+}
+
+function vote(x, y, k) {
+  const p = primes[k];
+  // Three incompatible affine walks; their thresholds drift at different rates.
+  const residue = (x * (k * 4 + 3) + y * (k * 7 + 5) + tick * (k * 2 + 1)) % p;
+  return residue < (p - 1) / 2 ? 1 : -1;
+}
+
+function draw() {
+  background(7, 17, 18, 28);
+  const step = max(8, floor(min(width, height) / 64));
+  const cols = ceil(width / step);
+  const rows = ceil(height / step);
+  let dissent = 0;
+  let agreement = 0;
+
+  // A slow dark wash makes previous testimony sediment rather than disappear.
+  fill(7, 17, 18, 20);
+  rect(0, 0, width, height);
+
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const a = vote(gx, gy, 0), b = vote(gx, gy, 1), c = vote(gx, gy, 2);
+      const sum = a + b + c;
+      const x = gx * step + step * .5;
+      const y = gy * step + step * .5;
+      if (abs(sum) === 1) {
+        dissent++;
+        const lone = a === b ? 2 : (a === c ? 1 : 0);
+        const [r, g, bl] = inks[lone];
+        const breath = 0.45 + 0.55 * sin(tick * .065 + gx * .31 - gy * .19);
+        fill(r, g, bl, 48 + 115 * breath);
+        const d = step * (.15 + .37 * breath);
+        circle(x, y, d);
+        if ((gx + gy + tick) % 11 === 0) {
+          fill(r, g, bl, 18);
+          circle(x, y, step * 1.7);
+        }
+      } else {
+        agreement++;
+        fill(156, 184, 172, 10);
+        circle(x, y, step * .12);
+      }
+    }
+  }
+
+  // A tide line samples the current disagreement field without explaining it.
+  noFill();
+  stroke(161, 231, 211, 36);
+  strokeWeight(1);
+  beginShape();
+  for (let x = 0; x <= width; x += step) {
+    const gx = floor(x / step), gy = floor(rows * .54);
+    const s = vote(gx, gy, 0) + vote(gx, gy, 1) + vote(gx, gy, 2);
+    vertex(x, height * .54 + s * step * 1.2);
+  }
+  endShape();
+  noStroke();
+
+  document.getElementById('readout').textContent =
+    'TICK ' + String(tick).padStart(5, '0') + '\n' +
+    'DISSENT ' + dissent + '\n' +
+    'AGREEMENT ' + agreement;
+  tick = (tick + 1) % 100000;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
