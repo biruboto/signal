@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>symmetry tax</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#07090d;color:#c9d2d7;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block}
+  #label{position:fixed;left:22px;bottom:20px;pointer-events:none;line-height:1.45;letter-spacing:.075em;font-size:11px;text-transform:uppercase;color:#aab7b7}
+  #label span{color:#e7a969}
+  #note{position:fixed;right:22px;top:18px;max-width:290px;text-align:right;pointer-events:none;font-size:10px;line-height:1.55;letter-spacing:.04em;color:#657277}
+</style>
+</head>
+<body>
+<div id="note">every mark owes an opposite.<br>the delay is the visible part.</div>
+<div id="label">symmetry tax<br><span id="readout">unpaid: 0</span></div>
+<script>
+let debts=[], settled=[], ticks=0, lastBirth=0;
+const palette=[[231,169,105],[121,191,186],[185,134,192],[218,225,210]];
+function setup(){createCanvas(windowWidth,windowHeight); pixelDensity(1); background(7,9,13);}
+function windowResized(){resizeCanvas(windowWidth,windowHeight); background(7,9,13); debts=[]; settled=[];}
+function newDebt(){
+  let margin=42, x=random(margin,width-margin), y=random(margin,height-margin);
+  let mirror={x:width-x,y:height-y};
+  let d=dist(x,y,mirror.x,mirror.y);
+  if(d<110)return;
+  let c=random(palette), delay=floor(map(noise(ticks*.018,x*.003,y*.003),0,1,36,210));
+  debts.push({x,y,mx:mirror.x,my:mirror.y,c,age:0,delay,sz:random(3,14),spin:random(TWO_PI)});
+}
+function mark(x,y,sz,c,a,spin){
+  push();translate(x,y);rotate(spin);noStroke();
+  fill(c[0],c[1],c[2],a); rectMode(CENTER);rect(0,0,sz,sz*.22);rect(0,0,sz*.22,sz);
+  pop();
+}
+function draw(){
+  // slow persistence makes balance a weather system rather than a snapshot
+  noStroke();fill(7,9,13,18);rect(0,0,width,height);
+  ticks++;
+  let interval=map(noise(ticks*.006),0,1,7,19);
+  if(ticks-lastBirth>interval){newDebt();lastBirth=ticks;}
+  for(let i=debts.length-1;i>=0;i--){
+    let d=debts[i];d.age++;
+    let pulse=sin(d.age*.13)*.5+.5;
+    stroke(d.c[0],d.c[1],d.c[2],map(d.age,0,d.delay,60,7));strokeWeight(.6);
+    line(d.x,d.y,lerp(d.x,d.mx,.13+pulse*.12),lerp(d.y,d.my,.13+pulse*.12));
+    mark(d.x,d.y,d.sz*(.65+pulse*.45),d.c,210,d.spin+d.age*.025);
+    if(d.age>=d.delay){
+      settled.push({x:d.mx,y:d.my,c:d.c,sz:d.sz,spin:-d.spin,life:0});debts.splice(i,1);
+    }
+  }
+  for(let i=settled.length-1;i>=0;i--){
+    let s=settled[i];s.life++;mark(s.x,s.y,s.sz,s.c,map(s.life,0,500,205,0),s.spin-s.life*.025);if(s.life>500)settled.splice(i,1);
+  }
+  // a nearly invisible central audit line
+  stroke(154,166,168,18);strokeWeight(1);line(width*.5,0,width*.5,height);line(0,height*.5,width,height*.5);
+  document.getElementById('readout').textContent='unpaid: '+debts.length+' · settled: '+settled.length;
+}
+function mousePressed(){newDebt();}
+</script>
+</body>
+</html>
