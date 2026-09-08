@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dovetail errata</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#080b0d;color:#cad3d0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block}
+  #caption{position:fixed;left:22px;bottom:19px;line-height:1.5;letter-spacing:.075em;font-size:11px;text-transform:uppercase;color:#aeb9b5;pointer-events:none}
+  #caption span{color:#d8ab68}
+  #note{position:fixed;right:22px;top:18px;max-width:310px;text-align:right;font-size:10px;line-height:1.55;letter-spacing:.04em;color:#65736f;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="note">a crossing is corrected only by the crossing that follows it.<br>the ledger never sees the whole braid.</div>
+<div id="caption">dovetail errata<br><span id="readout">active corrections: 0</span></div>
+<script>
+let beads=[], tick=0, cell=32;
+const ink=[[219,171,101],[110,181,175],[185,137,190],[210,222,205]];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(8,11,13);seed();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(8,11,13);beads=[];seed();}
+function seed(){for(let i=0;i<14;i++) birth(random(width),random(height),floor(random(2)));}
+function birth(x,y,parity){
+  let gx=constrain(floor(x/cell),1,floor(width/cell)-2), gy=constrain(floor(y/cell),1,floor(height/cell)-2);
+  beads.push({gx,gy,parity,age:0,wait:floor(random(2,16)),trail:[],c:random(ink)});
+}
+function gate(x,y,p){
+  // A local rule: the two binary digits of the address disagree, then reverse.
+  let n=(x*17+y*31+tick)>>>0;
+  return ((n^(n>>>3)^(n>>>7)^p)&1)?1:-1;
+}
+function drawKnot(x,y,dir,c,a){
+  let cx=(x+.5)*cell,cy=(y+.5)*cell,r=cell*.32;
+  noFill();stroke(c[0],c[1],c[2],a);strokeWeight(1.1);
+  arc(cx-r,cy,r*2,r*2,dir>0?0:HALF_PI,dir>0?HALF_PI:PI);
+  arc(cx+r,cy,r*2,r*2,dir>0?PI:PI+HALF_PI,dir>0?PI+HALF_PI:TWO_PI);
+}
+function draw(){
+  noStroke();fill(8,11,13,20);rect(0,0,width,height);tick++;
+  if(tick%38===0 && beads.length<90)birth(random(width),random(height),floor(random(2)));
+  for(let i=beads.length-1;i>=0;i--){
+    let b=beads[i];b.age++;
+    if(b.age%b.wait===0){
+      let turn=gate(b.gx,b.gy,b.parity);
+      b.trail.push({x:b.gx,y:b.gy,d:turn,life:0});
+      b.gx+=turn;b.gy+=((b.parity^((b.gx+b.gy)&1))?1:-1);
+      b.parity^=turn>0?1:0;
+    }
+    for(let j=b.trail.length-1;j>=0;j--){
+      let q=b.trail[j];q.life++;drawKnot(q.x,q.y,q.d,b.c,map(q.life,0,150,115,0));if(q.life>150)b.trail.splice(j,1);
+    }
+    let px=(b.gx+.5)*cell,py=(b.gy+.5)*cell;
+    noStroke();fill(b.c[0],b.c[1],b.c[2],210);circle(px,py,3.5);
+    if(b.gx<1||b.gx>width/cell-2||b.gy<1||b.gy>height/cell-2||b.age>500)beads.splice(i,1);
+  }
+  stroke(159,172,166,12);strokeWeight(1);
+  for(let x=cell*.5;x<width;x+=cell)line(x,0,x,height);
+  for(let y=cell*.5;y<height;y+=cell)line(0,y,width,y);
+  document.getElementById('readout').textContent='active corrections: '+beads.length+' · rule phase: '+(tick%256);
+}
+function mousePressed(){birth(mouseX,mouseY,floor(random(2)));}
+</script>
+</body>
+</html>
