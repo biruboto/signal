@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '119-reverse-jury', title: 'reverse jury', date: '2026-09-09' },
   { id: '118-dovetail-errata', title: 'dovetail errata', date: '2026-09-08' },
   { id: '117-symmetry-tax', title: 'symmetry tax', date: '2026-09-07' },
   { id: '116-witness-lagoon', title: 'witness lagoon', date: '2026-09-06' },

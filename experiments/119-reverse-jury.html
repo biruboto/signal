@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reverse jury</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  html,body{margin:0;overflow:hidden;background:#080a0d;color:#c7d1cc;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block}
+  #caption{position:fixed;left:22px;bottom:18px;font-size:11px;line-height:1.55;letter-spacing:.07em;text-transform:uppercase;pointer-events:none}
+  #caption span{color:#d5a96b}
+  #note{position:fixed;right:22px;top:18px;max-width:310px;text-align:right;font-size:10px;line-height:1.55;letter-spacing:.045em;color:#687570;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="note">each witness compares its last eight turns<br>against the same turns read from the other end.</div>
+<div id="caption">reverse jury<br><span id="readout">undecided windows: 0</span></div>
+<script>
+let motes=[], phase=0, unit=18;
+const hues=[[221,171,101],[113,183,178],[186,137,189],[202,218,204]];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(8,10,13);seed();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(8,10,13);motes=[];seed();}
+function seed(){for(let i=0;i<22;i++) summon(random(width),random(height));}
+function summon(x,y){motes.push({x:x,y:y,word:[],age:0,tint:random(hues),drift:random([-1,1])});}
+function verdict(word){
+  if(word.length<8)return 0;
+  for(let i=0;i<4;i++){
+    let a=word[i],b=word[7-i];
+    if(a!==b)return a>b?1:-1;
+  }
+  return 0;
+}
+function step(m){
+  let bit=((floor(m.x/unit)*13+floor(m.y/unit)*29+phase*7+m.age*3)^(floor(m.x/unit)*5))&1;
+  m.word.push(bit);if(m.word.length>8)m.word.shift();
+  let v=verdict(m.word), d=v===0?m.drift:v;
+  m.x+=d*unit*.42;
+  m.y+=(bit?1:-1)*unit*.35 + (v===0?0: v*unit*.08);
+  return v;
+}
+function glyph(m,v){
+  let a=v===0?38:112;
+  let r=unit*.34;
+  noFill();stroke(m.tint[0],m.tint[1],m.tint[2],a);strokeWeight(1);
+  if(v===0){circle(m.x,m.y,r);line(m.x-r,m.y,m.x+r,m.y);}
+  else {arc(m.x,m.y,r*2,r*2,v>0?0:PI,v>0?PI:0);}
+}
+function draw(){
+  noStroke();fill(8,10,13,18);rect(0,0,width,height);phase++;
+  let tied=0;
+  for(let i=motes.length-1;i>=0;i--){
+    let m=motes[i];m.age++;
+    let v=step(m);if(v===0)tied++;
+    glyph(m,v);
+    if(m.x<-unit||m.x>width+unit||m.y<-unit||m.y>height+unit||m.age>520)motes.splice(i,1);
+  }
+  if(phase%17===0&&motes.length<100)summon(random(width),random(height));
+  stroke(162,178,171,10);strokeWeight(1);
+  for(let x=unit*.5;x<width;x+=unit*4)line(x,0,x,height);
+  for(let y=unit*.5;y<height;y+=unit*4)line(0,y,width,y);
+  document.getElementById('readout').textContent='undecided windows: '+tied+' · comparison pulse: '+(phase%512);
+}
+function mousePressed(){summon(mouseX,mouseY);}
+</script>
+</body>
+</html>
