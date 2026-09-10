@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>denominator weather</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #080b0d; color: #e6e2d5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #caption { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .08em; line-height: 1.5; color: rgba(230,226,213,.72); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 19px; z-index: 2; text-align: right; font-size: 10px; letter-spacing: .09em; line-height: 1.65; color: rgba(230,226,213,.58); pointer-events: none; }
+    b { color: #f1be72; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>DENOMINATOR WEATHER</b><br>three clocks propose fractions; only shared denominators precipitate<br>click to change the weather system</div>
+<script>
+let systems = [
+  { a: 17, b: 29, c: 41, name: '17 / 29 / 41' },
+  { a: 13, b: 31, c: 47, name: '13 / 31 / 47' },
+  { a: 19, b: 23, c: 43, name: '19 / 23 / 43' },
+  { a: 11, b: 37, c: 53, name: '11 / 37 / 53' }
+];
+let mode = 0, tick = 0;
+const ink = [ [42, 69, 78], [71, 111, 113], [167, 132, 78], [220, 173, 95], [224, 226, 204] ];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  frameRate(30);
+  noStroke();
+}
+function gcd(a,b) { while (b) { let t = a % b; a = b; b = t; } return a; }
+function mod(n, m) { return ((n % m) + m) % m; }
+function reducedDen(n, d) { return d / gcd(n, d); }
+function draw() {
+  background(8, 11, 13, 42);
+  let s = systems[mode];
+  let cell = constrain(floor(min(width, height) / 18), 16, 42);
+  let cols = ceil(width / cell) + 2, rows = ceil(height / cell) + 2;
+  let epoch = floor(tick / 4);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      // Each observer sees the same moving numerator through a different modulus.
+      let n1 = mod(x * 3 + y * 5 + epoch, s.a) + 1;
+      let n2 = mod(x * 5 - y * 2 + epoch * 2, s.b) + 1;
+      let n3 = mod(x * 2 + y * 7 - epoch, s.c) + 1;
+      let d1 = reducedDen(n1, s.a), d2 = reducedDen(n2, s.b), d3 = reducedDen(n3, s.c);
+      let agreement = (d1 === d2 ? 1 : 0) + (d2 === d3 ? 1 : 0) + (d1 === d3 ? 1 : 0);
+      let burden = (d1 + d2 + d3) / (s.a + s.b + s.c);
+      let phase = (n1 / s.a + n2 / s.b + n3 / s.c) % 1;
+      let level = agreement ? min(4, 2 + agreement) : floor(phase * 2);
+      let c = ink[level];
+      let rain = agreement ? map(agreement, 1, 3, .38, .96) : map(burden, 0, 1, .03, .22);
+      fill(c[0], c[1], c[2], 255 * rain);
+      let px = x * cell, py = y * cell;
+      if (agreement) {
+        let w = cell * (.16 + phase * .52);
+        rect(px + (cell-w)/2, py + cell*.18, w, cell*.64, 1);
+        if (agreement > 1) { fill(242, 234, 203, 190); circle(px + cell/2, py + cell/2, cell*.11); }
+      } else if ((x + y + epoch) % 3 === 0) {
+        circle(px + cell/2, py + cell/2, cell * (.04 + burden * .18));
+      }
+    }
+  }
+  // A slow pressure line: it is not causal, merely legible.
+  noFill(); stroke(214, 164, 89, 75); strokeWeight(1);
+  let yy = height * (.5 + .34 * sin(epoch * .018));
+  for (let i = -1; i < 3; i++) arc(width*(i+.5), yy, width*.82, height*.42, PI, TWO_PI);
+  noStroke();
+  document.getElementById('readout').innerHTML =
+    'SYSTEM <b>' + s.name + '</b><br>' +
+    'EPOCH ' + String(epoch).padStart(5, '0') + '<br>' +
+    'PRESSURE ' + (50 + floor(49 * sin(epoch * .018))).toString().padStart(2,'0') + '%';
+  tick++;
+}
+function mousePressed() { mode = (mode + 1) % systems.length; tick = 0; background(8,11,13); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
