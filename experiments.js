@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '121-sumset-lantern', title: 'sumset lantern', date: '2026-09-11' },
   { id: '120-denominator-weather', title: 'denominator weather', date: '2026-09-10' },
   { id: '119-reverse-jury', title: 'reverse jury', date: '2026-09-09' },
   { id: '118-dovetail-errata', title: 'dovetail errata', date: '2026-09-08' },

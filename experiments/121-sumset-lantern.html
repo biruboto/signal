@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sumset lantern</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #090b0e; color: #e9e4d5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #caption { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .08em; line-height: 1.5; color: rgba(233,228,213,.72); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 19px; z-index: 2; text-align: right; font-size: 10px; letter-spacing: .09em; line-height: 1.65; color: rgba(233,228,213,.58); pointer-events: none; }
+    b { color: #e7b96a; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>SUMSET LANTERN</b><br>three small sets are added without carrying; crowded sums retain the light<br>click to choose another alphabet</div>
+<script>
+let alphabets = [
+  [3, 7, 12, 18, 25],
+  [2, 5, 11, 17, 29],
+  [1, 8, 13, 21, 24],
+  [4, 9, 15, 16, 27]
+];
+let mode = 0, epoch = 0;
+const palette = [[32,57,67], [51,94,102], [121,128,90], [202,157,82], [239,222,172]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  frameRate(30);
+  noStroke();
+}
+function mod(n, m) { return ((n % m) + m) % m; }
+function buildSet(seed, step, modulus) {
+  let out = [];
+  for (let i = 0; i < seed.length; i++) out.push(mod(seed[i] + step * (i + 1), modulus));
+  return out;
+}
+function draw() {
+  background(9, 11, 14, 48);
+  let unit = constrain(floor(min(width, height) / 19), 14, 38);
+  let cols = ceil(width / unit) + 2, rows = ceil(height / unit) + 2;
+  let a = alphabets[mode], modulus = 31;
+  let phase = floor(epoch / 16);
+  let A = buildSet(a, phase, modulus);
+  let B = buildSet(a.slice().reverse(), phase * 2 + 3, modulus);
+  let C = buildSet(a.map(x => x * 2), phase * 3 + 7, modulus);
+  let bright = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let residue = mod(x * 4 + y * 9 + phase, modulus);
+      let witnesses = 0, tension = 0;
+      for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+          let s1 = mod(A[i] + B[j], modulus);
+          let s2 = mod(B[i] + C[j], modulus);
+          let s3 = mod(C[i] + A[j], modulus);
+          if (residue === s1) witnesses++;
+          if (residue === s2) witnesses++;
+          if (residue === s3) witnesses++;
+          tension += abs(residue - s1) === 1 ? 1 : 0;
+        }
+      }
+      let level = witnesses === 0 ? 0 : min(4, floor(sqrt(witnesses)) + 1);
+      let c = palette[level];
+      let px = x * unit, py = y * unit;
+      if (witnesses) {
+        let radius = unit * (.11 + min(witnesses, 16) * .021);
+        fill(c[0], c[1], c[2], 40 + min(205, witnesses * 20));
+        circle(px + unit / 2, py + unit / 2, radius * 2);
+        if (witnesses > 7) {
+          fill(242, 226, 180, 105);
+          circle(px + unit / 2, py + unit / 2, radius * .44);
+        }
+        bright++;
+      } else if (tension > 1 && (x + y + phase) % 3 === 0) {
+        fill(56, 84, 86, 46);
+        rect(px + unit * .46, py + unit * .46, unit * .08, unit * .08);
+      }
+    }
+  }
+  noFill(); stroke(231, 185, 106, 55); strokeWeight(1);
+  let r = min(width, height) * (.22 + .035 * sin(phase * .13));
+  circle(width * .5, height * .5, r * 2);
+  circle(width * .5, height * .5, r * 1.37);
+  noStroke();
+  document.getElementById('readout').innerHTML =
+    'ALPHABET <b>' + a.map(n => String(n).padStart(2, '0')).join(' ') + '</b><br>' +
+    'MODULUS 31 · PHASE ' + String(phase).padStart(4, '0') + '<br>' +
+    'RETAINED SITES ' + String(bright).padStart(4, '0');
+  epoch++;
+}
+function mousePressed() { mode = (mode + 1) % alphabets.length; epoch = 0; background(9,11,14); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
