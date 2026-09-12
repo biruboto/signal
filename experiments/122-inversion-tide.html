@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inversion tide</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #070b10; color: #e6e1d1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #caption { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .075em; line-height: 1.5; color: rgba(230,225,209,.74); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 19px; z-index: 2; text-align: right; font-size: 10px; letter-spacing: .09em; line-height: 1.65; color: rgba(230,225,209,.58); pointer-events: none; }
+    b { color: #d9a75e; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>INVERSION TIDE</b><br>a permutation is slowly taught to stop disagreeing with itself<br>click to introduce another disorder</div>
+<script>
+let values = [], trace = [], cursor = 0, epoch = 0, swaps = 0;
+let seed = 17;
+const N = 37;
+const ink = [7, 11, 16], water = [39, 86, 99], sand = [213, 167, 94], salt = [232, 225, 202];
+
+function hash(n) { return ((n * 1664525 + 1013904223) >>> 0); }
+function reset() {
+  values = Array.from({length:N}, (_, i) => i);
+  let x = seed;
+  for (let i = N - 1; i > 0; i--) { x = hash(x); let j = x % (i + 1); [values[i], values[j]] = [values[j], values[i]]; }
+  trace = []; cursor = 0; swaps = 0;
+}
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1); frameRate(30); reset();
+}
+function inversions() {
+  let total = 0;
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) if (values[i] > values[j]) total++;
+  return total;
+}
+function advance() {
+  let tries = 0;
+  while (tries++ < N) {
+    let a = cursor, b = (cursor + 1) % N;
+    cursor = (cursor + 1) % N;
+    if (values[a] > values[b]) {
+      let before = inversions();
+      [values[a], values[b]] = [values[b], values[a]];
+      swaps++;
+      trace.push({a, b, life: 1, before});
+      if (trace.length > 90) trace.shift();
+      return;
+    }
+  }
+  seed = hash(seed); reset();
+}
+function draw() {
+  background(...ink, 70);
+  if (epoch % 4 === 0) advance();
+  let margin = min(width * .12, 170), span = width - margin * 2;
+  let base = height * .57, amplitude = min(height * .27, 210);
+  noFill(); stroke(water[0], water[1], water[2], 55); strokeWeight(1);
+  for (let k = 0; k < 5; k++) {
+    beginShape();
+    for (let x = 0; x <= width; x += 12) vertex(x, base + amplitude * .65 + k * 24 + sin(x * .009 + epoch * .025 + k) * 9);
+    endShape();
+  }
+  for (let t of trace) {
+    let x1 = margin + t.a * span / (N - 1), x2 = margin + t.b * span / (N - 1);
+    let lift = amplitude * (.24 + .52 * t.life);
+    noFill(); stroke(sand[0], sand[1], sand[2], 120 * t.life); strokeWeight(1.2);
+    bezier(x1, base, x1, base-lift, x2, base-lift, x2, base);
+    t.life *= .965;
+  }
+  trace = trace.filter(t => t.life > .025);
+  for (let i = 0; i < N; i++) {
+    let x = margin + i * span / (N - 1);
+    let y = base - map(values[i], 0, N-1, 0, amplitude);
+    stroke(water[0], water[1], water[2], 105); strokeWeight(1);
+    line(x, base, x, y);
+    noStroke(); fill(sand[0], sand[1], sand[2], 190);
+    circle(x, y, 4 + (values[i] % 3));
+    if (values[i] % 9 === 0) { fill(...salt, 170); circle(x, y, 2.2); }
+  }
+  let inv = inversions(), maximum = N * (N - 1) / 2;
+  document.getElementById('readout').innerHTML =
+    'ORDER <b>' + String(N).padStart(2, '0') + '</b> · ADJACENT EXCHANGE<br>' +
+    'REMAINING INVERSION <b>' + String(inv).padStart(4, '0') + '</b> / ' + maximum + '<br>' +
+    'TIDE CARRIED ' + String(swaps).padStart(5, '0');
+  epoch++;
+}
+function mousePressed() { seed = hash(seed + floor(mouseX * 31 + mouseY)); reset(); background(...ink); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
