@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>remainder loom</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #080b0d; color: #e7dfc9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #caption { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .075em; line-height: 1.55; color: rgba(231,223,201,.74); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 19px; z-index: 2; text-align: right; font-size: 10px; letter-spacing: .09em; line-height: 1.65; color: rgba(231,223,201,.58); pointer-events: none; }
+    b { color: #d7a95e; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>REMAINDER LOOM</b><br>each thread keeps only what the next clock cannot divide<br>click to change the loom</div>
+<script>
+let moduli = [7, 11, 13, 17, 19], phase = 0, drift = 0, serial = 1;
+const ink = [8,11,13], teal = [67,139,140], gold = [215,169,94], pale = [231,223,201];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  frameRate(30);
+}
+function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
+function weave() {
+  background(...ink, 38);
+  const left = max(42, width * .11), right = width - left;
+  const top = max(72, height * .18), bottom = height - max(70, height * .16);
+  const rows = min(57, max(21, floor(height / 13)));
+  const span = right - left;
+  noFill();
+  for (let r = 0; r < rows; r++) {
+    const m = moduli[r % moduli.length];
+    const y = map(r, 0, rows - 1, top, bottom);
+    const offset = floor(phase * (r % 3 + 1) + r * r + drift) % m;
+    beginShape();
+    for (let x = 0; x <= span; x += 5) {
+      const n = floor(map(x, 0, span, 0, 180));
+      const residue = (n + offset) % m;
+      const gate = gcd(residue || m, m);
+      const lift = map(gate, 1, m, 1, 15) * sin((n + phase) * TWO_PI / m);
+      const knot = residue === 0 ? -13 : 0;
+      stroke(residue === 0 ? gold[0] : teal[0], residue === 0 ? gold[1] : teal[1], residue === 0 ? gold[2] : teal[2], residue === 0 ? 135 : 42);
+      strokeWeight(residue === 0 ? 1.15 : .7);
+      vertex(left + x, y + lift + knot);
+    }
+    endShape();
+    for (let n = 0; n <= 180; n++) {
+      const residue = (n + offset) % m;
+      if (residue === 0) {
+        const x = left + map(n, 0, 180, 0, span);
+        noStroke(); fill(...gold, 185); circle(x, y - 13, 2.7);
+      }
+    }
+  }
+  stroke(...pale, 38); strokeWeight(.7);
+  line(left, top - 26, right, top - 26);
+  let coincidences = moduli.reduce((sum, m) => sum + (phase % m === 0 ? 1 : 0), 0);
+  document.getElementById('readout').innerHTML =
+    'THREADS <b>' + String(rows).padStart(2, '0') + '</b> · WARP ' + moduli.join('·') + '<br>' +
+    'CLOCK STEP <b>' + String(phase % 10000).padStart(4, '0') + '</b><br>' +
+    'SIMULTANEOUS RETURNS <b>' + coincidences + '</b>';
+}
+function draw() { weave(); phase += 0.19; }
+function mousePressed() {
+  serial = (serial * 1664525 + 1013904223) >>> 0;
+  const choices = [5,7,8,9,11,13,15,17,19,23,29];
+  moduli = Array.from({length:5}, (_, i) => choices[(serial >>> (i * 4)) % choices.length]);
+  drift += 17 + (serial % 41); phase = 0;
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>

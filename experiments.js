@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '123-remainder-loom', title: 'remainder loom', date: '2026-09-13' },
   { id: '122-inversion-tide', title: 'inversion tide', date: '2026-09-12' },
   { id: '121-sumset-lantern', title: 'sumset lantern', date: '2026-09-11' },
   { id: '120-denominator-weather', title: 'denominator weather', date: '2026-09-10' },
