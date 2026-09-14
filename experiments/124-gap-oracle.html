@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gap oracle</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #090b0e; color: #e6e1d3; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #caption { position: fixed; left: 22px; bottom: 19px; z-index: 2; font-size: 11px; letter-spacing: .075em; line-height: 1.55; color: rgba(230,225,211,.74); pointer-events: none; }
+    #readout { position: fixed; right: 22px; top: 19px; z-index: 2; text-align: right; font-size: 10px; letter-spacing: .09em; line-height: 1.65; color: rgba(230,225,211,.58); pointer-events: none; }
+    b { color: #cf9e64; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div id="caption"><b>GAP ORACLE</b><br>a needle divides a circle; the missing distances make three families<br>click to reseed the angle</div>
+<script>
+let theta = (Math.sqrt(5) - 1) / 2, count = 2, lastStep = 0, seed = 17;
+const ink = [9,11,14], ash = [226,221,207], ember = [207,158,100], blue = [90,151,158];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  frameRate(30);
+}
+function fract(x) { return x - Math.floor(x); }
+function gapsFor(n) {
+  const pts = Array.from({length:n}, (_, i) => fract(i * theta)).sort((a,b) => a-b);
+  const gaps = pts.map((p, i) => (i === n - 1 ? pts[0] + 1 : pts[i + 1]) - p);
+  const kinds = [];
+  gaps.forEach(g => { if (!kinds.some(k => Math.abs(k - g) < 1e-7)) kinds.push(g); });
+  kinds.sort((a,b) => a-b);
+  return {pts, gaps, kinds};
+}
+function drawOracle() {
+  background(...ink, 52);
+  const cx = width * .5, cy = height * .49;
+  const radius = min(width, height) * .315;
+  const data = gapsFor(count), {pts, gaps, kinds} = data;
+  const rings = min(15, max(5, floor(radius / 28)));
+
+  noFill();
+  for (let r = 0; r < rings; r++) {
+    const rr = radius * (1 - r / (rings + 1));
+    stroke(...ash, 10 + r * 1.4); strokeWeight(.6); circle(cx, cy, rr * 2);
+  }
+  // Each point points to the interval it just closes. Color is interval family, not point identity.
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i] * TWO_PI - HALF_PI;
+    const g = gaps[i];
+    const family = kinds.findIndex(k => Math.abs(k - g) < 1e-7);
+    const col = family === 0 ? blue : family === 1 ? ash : ember;
+    const r0 = radius * .22, r1 = radius * (.58 + .38 * constrain(g / max(...gaps), 0, 1));
+    stroke(...col, family === 2 ? 145 : 88); strokeWeight(family === 2 ? 1.25 : .72);
+    line(cx + cos(a) * r0, cy + sin(a) * r0, cx + cos(a) * r1, cy + sin(a) * r1);
+  }
+  noStroke();
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i] * TWO_PI - HALF_PI;
+    const g = gaps[i], family = kinds.findIndex(k => Math.abs(k - g) < 1e-7);
+    const col = family === 0 ? blue : family === 1 ? ash : ember;
+    fill(...col, 205); circle(cx + cos(a) * radius, cy + sin(a) * radius, family === 2 ? 4 : 2.4);
+  }
+  fill(...ink, 220); circle(cx, cy, radius * .31);
+  noFill(); stroke(...ember, 125); strokeWeight(1); circle(cx, cy, radius * .31);
+  const pulse = 2 + 5 * (sin(frameCount * .09) + 1) / 2;
+  noStroke(); fill(...ember, 215); circle(cx, cy, pulse);
+  const labels = kinds.map(g => g.toFixed(5)).join(' · ');
+  document.getElementById('readout').innerHTML =
+    'NEEDLES <b>' + String(count).padStart(3, '0') + '</b><br>' +
+    'DISTINCT GAPS <b>' + kinds.length + '</b><br>' +
+    'MEASURES ' + labels;
+}
+function draw() {
+  drawOracle();
+  if (frameCount - lastStep > 7) { count = count >= 233 ? 2 : count + 1; lastStep = frameCount; }
+}
+function mousePressed() {
+  seed = (seed * 1103515245 + 12345) >>> 0;
+  theta = fract(((seed % 1000003) + 0.5) / 1000003 * 0.71 + (Math.sqrt(2) - 1) * .29);
+  if (theta < .08 || theta > .92) theta = (Math.sqrt(5) - 1) / 2;
+  count = 2; lastStep = frameCount;
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
