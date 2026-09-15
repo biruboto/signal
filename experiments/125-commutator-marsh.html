@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>commutator marsh</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07100e; color: #dbe6cb; }
+    canvas { display: block; }
+    #label { position: fixed; left: 18px; bottom: 16px; max-width: 28rem; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .03em; color: #b9c5ae; pointer-events: none; }
+    #label b { color: #e7f0d6; font-weight: 500; }
+    #rule { position: fixed; right: 18px; top: 16px; text-align: right; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #899982; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="rule"></div>
+  <div id="label"><b>commutator marsh</b><br>two small instructions visit each cell in opposite orders. their disagreement becomes a reed.</div>
+<script>
+let cell = 15, cols, rows, field, next, palette = 0, tick = 0;
+const rules = [
+  { name: 'shift / invert', a: (v, n) => (v + (n & 3) + 1) % 7, b: (v, n) => (6 - v + (n % 2)) % 7 },
+  { name: 'fold / borrow', a: (v, n) => (v * 2 + n % 3) % 7, b: (v, n) => (v + Math.floor(n / 2) + 2) % 7 },
+  { name: 'echo / shear', a: (v, n) => (v + n + 1) % 7, b: (v, n) => (v * 3 + n % 2) % 7 }
+];
+function setup() { createCanvas(windowWidth, windowHeight); pixelDensity(1); seed(); }
+function seed() {
+  cols = Math.ceil(width / cell); rows = Math.ceil(height / cell);
+  field = Array.from({length: rows}, (_, y) => Array.from({length: cols}, (_, x) => (random() < .045 || (x + 2*y) % 31 === 0) ? floor(random(1, 7)) : 0));
+  next = field.map(r => r.slice());
+}
+function neighbor(x, y) {
+  let s = 0;
+  for (let j=-1;j<=1;j++) for (let i=-1;i<=1;i++) if (i || j) s += field[(y+j+rows)%rows][(x+i+cols)%cols];
+  return s % 7;
+}
+function draw() {
+  background(7, 16, 14, 60);
+  const r = rules[palette];
+  for (let y=0; y<rows; y++) for (let x=0; x<cols; x++) {
+    const v = field[y][x], n = neighbor(x,y);
+    const ab = r.b(r.a(v,n),n), ba = r.a(r.b(v,n),n);
+    const disagreement = (ab - ba + 7) % 7;
+    next[y][x] = disagreement ? disagreement : (v && random() < .14 ? v - 1 : 0);
+    if (disagreement) {
+      const h = map(disagreement, 1, 6, 90, 176);
+      const glow = 45 + disagreement * 22;
+      noStroke(); fill(h, glow, 112, 175);
+      rect(x*cell, y*cell, cell-1, cell-1);
+      if (disagreement > 4) { fill(210, 226, 173, 120); rect(x*cell + cell*.36, y*cell + cell*.15, 1, cell*.65); }
+    } else if (v) { noStroke(); fill(35, 75, 58, 105); rect(x*cell+2, y*cell+2, cell-5, cell-5); }
+  }
+  [field, next] = [next, field]; tick++;
+  if (tick % 75 === 0 && random() < .55) field[floor(random(rows))][floor(random(cols))] = floor(random(2,7));
+  document.getElementById('rule').innerHTML = 'order: A → B &nbsp; / &nbsp; B → A<br>rule: ' + r.name + '<br>click: exchange the operators';
+}
+function mousePressed() { palette = (palette + 1) % rules.length; seed(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); seed(); }
+</script>
+</body>
+</html>
