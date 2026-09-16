@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>quiet lattice</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: hidden; background: #090b0c; color: #d8ded6; }
+  canvas { display: block; }
+  #note { position: fixed; left: 22px; bottom: 19px; max-width: 390px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; color: #89958e; pointer-events: none; }
+  #note b { color: #c3cdbf; font-weight: 500; }
+  #seed { position: fixed; right: 22px; top: 19px; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: #66716b; }
+</style>
+</head>
+<body>
+<div id="seed"></div>
+<div id="note"><b>quiet lattice</b><br>two incompatible counts negotiate a border<br>click: introduce a new disagreement</div>
+<script>
+let cells = [], cols, rows, cell, tick = 0, salt;
+const phi = (1 + Math.sqrt(5)) / 2;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  restart();
+}
+
+function restart() {
+  cell = max(7, floor(min(width, height) / 72));
+  cols = ceil(width / cell) + 2;
+  rows = ceil(height / cell) + 2;
+  salt = floor(random(100000, 999999));
+  randomSeed(salt);
+  noiseSeed(salt);
+  cells = Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => {
+    const a = floor((x * phi + y * (phi - 1)) % 2);
+    const b = floor((x * (phi - 1) - y * phi) % 2);
+    return (a + b + (random() > .92 ? 1 : 0)) % 2;
+  }));
+  tick = 0;
+  document.getElementById('seed').textContent = 'DISAGREEMENT ' + salt;
+  background(9, 11, 12);
+}
+
+function draw() {
+  background(9, 11, 12, 42);
+  const next = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const driftA = floor(tick / 47);
+  const driftB = floor(tick / 73);
+
+  for (let y = 1; y < rows - 1; y++) {
+    for (let x = 1; x < cols - 1; x++) {
+      const here = cells[y][x];
+      const near = cells[y-1][x] + cells[y+1][x] + cells[y][x-1] + cells[y][x+1];
+      // Two clocks decide independently; only their disagreement permits change.
+      const clockA = floor((x + driftA) * phi + y * (phi - 1)) & 1;
+      const clockB = floor(x * (phi - 1) - (y + driftB) * phi) & 1;
+      const border = clockA ^ clockB;
+      next[y][x] = border ? ((near === 2 || near === 3) ? 1 : 0) : here;
+      const age = noise(x * .075, y * .075, tick * .006);
+      if (next[y][x]) {
+        const flare = border ? 1 : .42;
+        noStroke();
+        fill(133 + 58 * age, 177 + 40 * age, 160 + 28 * age, 165 * flare);
+        rect((x - 1) * cell, (y - 1) * cell, cell - 1, cell - 1);
+      } else if (border && near === 2) {
+        stroke(97, 119, 109, 48);
+        point((x - .5) * cell, (y - .5) * cell);
+      }
+    }
+  }
+  cells = next;
+  tick++;
+}
+
+function mousePressed() {
+  const cx = floor(mouseX / cell) + 1, cy = floor(mouseY / cell) + 1;
+  for (let y = cy - 4; y <= cy + 4; y++) for (let x = cx - 4; x <= cx + 4; x++) {
+    if (x > 0 && x < cols - 1 && y > 0 && y < rows - 1 && dist(x, y, cx, cy) < 4.5) cells[y][x] ^= 1;
+  }
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); restart(); }
+</script>
+</body>
+</html>

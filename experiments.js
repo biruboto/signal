@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '126-quiet-lattice', title: 'quiet lattice', date: '2026-09-16' },
   { id: '125-commutator-marsh', title: 'commutator marsh', date: '2026-09-15' },
   { id: '124-gap-oracle', title: 'gap oracle', date: '2026-09-14' },
   { id: '123-remainder-loom', title: 'remainder loom', date: '2026-09-13' },
