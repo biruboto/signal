@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>rotation archive</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #070a0d; color: #c7d3d5; }
+    canvas { display: block; }
+    #readout { position: fixed; left: 20px; bottom: 17px; font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(199,211,213,.68); pointer-events: none; }
+    .caption { position: fixed; right: 20px; bottom: 17px; max-width: 270px; text-align: right; font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em; color: rgba(199,211,213,.45); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="readout"></div>
+  <div class="caption">a wheel of residues is sampled by an irrational hand.<br>each return leaves its interval behind.</div>
+<script>
+let phi = (1 + Math.sqrt(5)) / 2;
+let words = [];
+let hits = [];
+let tick = 0;
+let lastStep = 0;
+let readout;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  readout = document.getElementById('readout');
+  buildArchive();
+  background('#070a0d');
+}
+
+function buildArchive() {
+  words = [];
+  for (let n = 0; n < 89; n++) {
+    let r = (n * 34) % 89;
+    let glyph = r % 3 === 0 ? '·' : r % 3 === 1 ? '╱' : '╲';
+    words.push({ n, r, glyph, seen: -1, interval: 0 });
+  }
+  hits = [];
+  tick = 0;
+  lastStep = 0;
+}
+
+function draw() {
+  const step = floor(frameCount / 7);
+  if (step !== lastStep) {
+    lastStep = step;
+    sample(step);
+  }
+  renderArchive();
+}
+
+function sample(step) {
+  const index = floor(((step / phi) % 1) * words.length);
+  const w = words[index];
+  w.interval = w.seen < 0 ? 0 : step - w.seen;
+  w.seen = step;
+  hits.push({ index, interval: w.interval, step, r: w.r });
+  if (hits.length > 210) hits.shift();
+  tick = step;
+}
+
+function renderArchive() {
+  background(7, 10, 13, 30);
+  const margin = min(width, height) * 0.09;
+  const cx = width * 0.5;
+  const cy = height * 0.46;
+  const radius = min(width, height) * 0.30;
+
+  noFill();
+  stroke(127, 170, 173, 26);
+  strokeWeight(1);
+  for (let k = 1; k <= 4; k++) ellipse(cx, cy, radius * k / 2, radius * k / 2);
+
+  for (let i = 0; i < words.length; i++) {
+    const a = TWO_PI * i / words.length - HALF_PI;
+    const w = words[i];
+    const recent = max(0, 1 - (tick - w.seen) / 120);
+    const rr = radius * (0.74 + (w.r / 88) * 0.27);
+    const x = cx + cos(a) * rr;
+    const y = cy + sin(a) * rr;
+    const hue = w.r % 3 === 0 ? [133, 189, 186] : w.r % 3 === 1 ? [198, 151, 105] : [154, 137, 196];
+    stroke(hue[0], hue[1], hue[2], 35 + recent * 140);
+    strokeWeight(1 + recent * 1.5);
+    const x2 = cx + cos(a) * (rr + 8 + recent * 15);
+    const y2 = cy + sin(a) * (rr + 8 + recent * 15);
+    line(x, y, x2, y2);
+    if (recent > .18) {
+      noStroke(); fill(hue[0], hue[1], hue[2], recent * 210);
+      circle(x2, y2, 2 + recent * 3);
+    }
+  }
+
+  for (let j = 0; j < hits.length; j++) {
+    const h = hits[j];
+    const age = hits.length - 1 - j;
+    const a = TWO_PI * h.index / words.length - HALF_PI;
+    const base = radius * (0.74 + h.r / 88 * 0.27);
+    const lift = map(age, 0, 210, 38, 3);
+    const x = cx + cos(a) * (base + lift);
+    const y = cy + sin(a) * (base + lift);
+    const alpha = map(age, 0, 210, 120, 5);
+    noStroke();
+    fill(222, 232, 219, alpha);
+    circle(x, y, 1.2 + min(5, h.interval * .18));
+  }
+
+  const current = hits[hits.length - 1];
+  if (current) {
+    const a = TWO_PI * current.index / words.length - HALF_PI;
+    const rr = radius * (0.74 + current.r / 88 * 0.27);
+    stroke(232, 239, 220, 130);
+    strokeWeight(1);
+    line(cx, cy, cx + cos(a) * rr, cy + sin(a) * rr);
+    noStroke(); fill(232, 239, 220, 220);
+    circle(cx, cy, 4);
+    readout.textContent = `rotation ${String(tick).padStart(4,'0')}  ·  residue ${String(current.r).padStart(2,'0')}  ·  return interval ${String(current.interval).padStart(3,'0')}`;
+  }
+}
+
+function mousePressed() { buildArchive(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script>
+</body>
+</html>
