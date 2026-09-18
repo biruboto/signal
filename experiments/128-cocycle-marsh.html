@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cocycle marsh</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07100e; color: #d6ddd0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 20px; bottom: 18px; max-width: 31rem; font-size: 11px; letter-spacing: .055em; line-height: 1.55; color: rgba(214,221,208,.76); pointer-events: none; }
+    #title { color: #e7ecd9; }
+    #readout { color: #94b59a; }
+  </style>
+</head>
+<body>
+  <div id="caption"><span id="title">cocycle marsh</span> — each square inherits a difference, not a state.<br><span id="readout"></span></div>
+<script>
+let cols, rows, cell, field, trace, generation = 0, drift = 0;
+const states = 7;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  initialize();
+  noStroke();
+}
+
+function initialize() {
+  cell = max(7, floor(min(width, height) / 54));
+  cols = ceil(width / cell) + 2;
+  rows = ceil(height / cell) + 2;
+  field = Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => (x * 3 + y * 5 + floor(noise(x * .17, y * .17) * states)) % states));
+  trace = Array.from({ length: rows }, () => Array(cols).fill(0));
+  generation = 0;
+}
+
+function draw() {
+  background(7, 16, 14, 34);
+  for (let pass = 0; pass < 3; pass++) advance();
+  renderMarsh();
+  document.getElementById('readout').textContent = `generation ${generation} · drift ${drift} · click to alter the boundary`;
+}
+
+function advance() {
+  const next = Array.from({ length: rows }, () => Array(cols).fill(0));
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const a = field[y][x];
+      const west = field[y][(x - 1 + cols) % cols];
+      const north = field[(y - 1 + rows) % rows][x];
+      const diagonal = field[(y - 1 + rows) % rows][(x - 1 + cols) % cols];
+      // A discrete curl: changes are carried around a square, never simply copied.
+      const curl = (a - west - north + diagonal + states * 3) % states;
+      const tide = (x * 2 + y * 3 + generation + drift) % states;
+      next[y][x] = (a + curl + (curl === tide ? 2 : 0) + (noise(x*.09, y*.09, generation*.008) > .986 ? 1 : 0)) % states;
+      trace[y][x] = lerp(trace[y][x], curl === 0 ? .06 : .82, .18);
+    }
+  }
+  field = next;
+  generation++;
+}
+
+function renderMarsh() {
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const s = field[y][x];
+      const t = trace[y][x];
+      const n = noise(x * .13, y * .13, generation * .004);
+      const hue = 112 + s * 8 + n * 14;
+      const lum = 10 + s * 5 + t * 24;
+      fill(`hsla(${hue}, ${28 + t*42}%, ${lum}%, ${.16 + t*.52})`);
+      const inset = (1-t) * cell * .42;
+      rect(x * cell + inset, y * cell + inset, cell - inset * 2, cell - inset * 2, cell * .18);
+      if (t > .58 && (x + y + generation) % 4 === 0) {
+        fill(186, 214, 175, 70 * t);
+        rect(x * cell + cell*.46, y * cell + cell*.15, max(1, cell*.08), cell*.66);
+      }
+    }
+  }
+}
+
+function mousePressed() {
+  drift = (drift + 1) % states;
+  const cx = floor(mouseX / cell), cy = floor(mouseY / cell);
+  for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+    const yy = (cy + y + rows) % rows, xx = (cx + x + cols) % cols;
+    if (x*x + y*y < 6) field[yy][xx] = (field[yy][xx] + drift + 2) % states;
+  }
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); initialize(); }
+</script>
+</body>
+</html>
