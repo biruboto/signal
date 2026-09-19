@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vanishing intervals</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #070b10; color: #d6d9d4; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 20px; bottom: 18px; max-width: 33rem; font-size: 11px; letter-spacing: .05em; line-height: 1.55; color: rgba(214,217,212,.76); pointer-events: none; }
+    #title { color: #f0eee3; } #readout { color: #a8bbc6; }
+  </style>
+</head>
+<body>
+  <div id="caption"><span id="title">vanishing intervals</span> — every witness rules out a strip; what remains is briefly luminous.<br><span id="readout"></span></div>
+<script>
+let bands = [], tick = 0, periodSet = [47, 71, 113, 167], offset = 0;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  seedBands();
+  noStroke();
+}
+
+function seedBands() {
+  const count = max(38, floor(height / 13));
+  bands = Array.from({ length: count }, (_, i) => ({
+    y: (i + .5) / count,
+    phase: random(),
+    width: random(.14, .86),
+    age: floor(random(300)),
+    tint: random()
+  }));
+  tick = 0;
+}
+
+function exclusionAt(x, b) {
+  let permission = 1;
+  for (let k = 0; k < periodSet.length; k++) {
+    const p = periodSet[k];
+    const witness = fract((tick + b.age + offset * 19) / p + b.phase * (k + 1));
+    const distance = abs(fract(x * (k + 2) + witness) - .5) * 2;
+    permission *= smoothstep(.10, .34 + k * .025, distance);
+  }
+  return permission;
+}
+
+function draw() {
+  background(7, 11, 16, 42);
+  const slices = max(120, floor(width / 6));
+  const h = height / bands.length;
+  for (let j = 0; j < bands.length; j++) {
+    const b = bands[j];
+    const y = b.y * height;
+    for (let i = 0; i < slices; i++) {
+      const x = i / slices;
+      const allowed = exclusionAt(x, b);
+      if (allowed > .018) {
+        const halo = pow(allowed, .55);
+        const hue = 194 + b.tint * 34 + sin((j + tick * .012) * .17) * 10;
+        fill(`hsla(${hue}, ${28 + halo * 44}%, ${12 + halo * 58}%, ${.035 + halo * .72})`);
+        rect(i * width / slices, y - h * .31, width / slices + 1, h * (.34 + halo * .42));
+      }
+    }
+  }
+  if (frameCount % 2 === 0) tick++;
+  document.getElementById('readout').textContent = `witnesses ${periodSet.join(' · ')} · step ${tick} · click to change the inquiry`;
+}
+
+function fract(n) { return n - floor(n); }
+function smoothstep(a, b, x) { const t = constrain((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function mousePressed() { offset++; periodSet = periodSet.map((p, i) => 31 + ((p + 17 * (i + 1) + offset * 7) % 173)); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); seedBands(); }
+</script>
+</body>
+</html>
