@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '130-interval-exchange', title: 'interval exchange', date: '2026-09-20' },
   { id: '129-vanishing-intervals', title: 'vanishing intervals', date: '2026-09-19' },
   { id: '128-cocycle-marsh', title: 'cocycle marsh', date: '2026-09-18' },
   { id: '127-rotation-archive', title: 'rotation archive', date: '2026-09-17' },

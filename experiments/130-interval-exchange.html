@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>interval exchange</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090e; color: #d8d7cf; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    canvas { display: block; }
+    #caption { position: fixed; left: 20px; bottom: 18px; max-width: 36rem; font-size: 11px; line-height: 1.58; letter-spacing: .045em; color: rgba(216,215,207,.76); pointer-events: none; }
+    #title { color: #f2efe3; } #readout { color: #a9c5be; }
+  </style>
+</head>
+<body>
+  <div id="caption"><span id="title">interval exchange</span> — a line is cut, reordered, and asked to remember its crossings.<br><span id="readout"></span></div>
+<script>
+let cuts, order, history = [], generation = 0, pointCount = 700;
+const ink = [[178,62,66],[34,78,70],[282,54,70],[48,88,76],[210,48,74]];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  resetExchange();
+  noStroke();
+}
+
+function resetExchange() {
+  cuts = [0, random(.11,.2), random(.3,.4), random(.54,.67), random(.78,.89), 1].sort((a,b) => a-b);
+  order = shuffle([0,1,2,3,4]);
+  history = Array.from({length: max(110, floor(height / 5))}, () => new Float32Array(pointCount));
+  for (let r = 0; r < history.length; r++) {
+    for (let i = 0; i < pointCount; i++) history[r][i] = (i + .5) / pointCount;
+  }
+  generation = 0;
+}
+
+function exchange(x) {
+  let source = 4;
+  for (let i = 0; i < 5; i++) if (x >= cuts[i] && x < cuts[i + 1]) { source = i; break; }
+  const local = (x - cuts[source]) / (cuts[source + 1] - cuts[source]);
+  let base = 0;
+  for (let i = 0; i < order.length; i++) {
+    if (order[i] === source) return base + local * (cuts[source + 1] - cuts[source]);
+    base += cuts[order[i] + 1] - cuts[order[i]];
+  }
+  return x;
+}
+
+function draw() {
+  background(7, 9, 14, 38);
+  const rows = history.length;
+  const step = max(1, floor(rows / 150));
+  for (let r = 0; r < rows; r += step) {
+    const y = map(r, 0, rows - 1, 0, height);
+    const row = history[r];
+    for (let i = 0; i < pointCount; i++) {
+      const x = row[i] * width;
+      let part = 0;
+      for (let k = 0; k < 5; k++) if (row[i] >= cuts[k] && row[i] < cuts[k+1]) { part = k; break; }
+      const c = ink[part];
+      const shimmer = .18 + .55 * sin((generation * .07 + i * .019 + r * .031));
+      fill(c[0], c[1], c[2], 14 + 24 * shimmer);
+      rect(x, y, max(1, width / pointCount + .4), step + .5);
+    }
+  }
+  if (frameCount % 3 === 0) advance();
+  const widths = order.map(i => (cuts[i+1] - cuts[i]).toFixed(2)).join(' · ');
+  document.getElementById('readout').textContent = `permutation ${order.map(n => n + 1).join(' ')} · fragments ${widths} · exchange ${generation} · click to recut`;
+}
+
+function advance() {
+  for (let r = history.length - 1; r > 0; r--) history[r] = history[r - 1];
+  const next = new Float32Array(pointCount);
+  const prior = history[1];
+  for (let i = 0; i < pointCount; i++) next[i] = exchange(prior[i]);
+  history[0] = next;
+  generation++;
+}
+
+function mousePressed() { resetExchange(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); resetExchange(); }
+</script>
+</body>
+</html>
