@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>deferred voronoi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #07090c; color: #d8ddd3; }
+    canvas { display: block; }
+    #legend { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(216,221,211,.66); pointer-events: none; }
+    #title { color: rgba(232,238,225,.94); margin-bottom: 4px; }
+    #readout { color: rgba(167,190,176,.72); }
+  </style>
+</head>
+<body>
+  <div id="legend"><div id="title">deferred voronoi</div><div id="readout"></div></div>
+  <script>
+    const seeds = [
+      { x: 0.18, y: 0.29, r: 5, c: [100, 176, 166] },
+      { x: 0.75, y: 0.22, r: 7, c: [215, 171, 102] },
+      { x: 0.57, y: 0.76, r: 11, c: [178, 125, 192] },
+      { x: 0.23, y: 0.72, r: 13, c: [109, 142, 202] }
+    ];
+    let epoch = 0;
+    let grain;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      grain = makeGrain();
+    }
+
+    function makeGrain() {
+      const g = createGraphics(160, 160);
+      g.loadPixels();
+      for (let i = 0; i < g.pixels.length; i += 4) {
+        const v = random() < 0.5 ? 10 : 0;
+        g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = v;
+        g.pixels[i + 3] = 28;
+      }
+      g.updatePixels();
+      return g;
+    }
+
+    function draw() {
+      background(7, 9, 12);
+      const now = millis() / 1000;
+      const unit = max(10, floor(min(width, height) / 76));
+      const cols = ceil(width / unit), rows = ceil(height / unit);
+      let delays = [0, 0, 0, 0];
+      for (let gy = 0; gy < rows; gy++) {
+        for (let gx = 0; gx < cols; gx++) {
+          const px = (gx + .5) / cols, py = (gy + .5) / rows;
+          let winner = 0, best = Infinity, second = Infinity;
+          for (let i = 0; i < seeds.length; i++) {
+            const s = seeds[i];
+            const sx = s.x + .038 * sin(now / s.r + i * 2.1);
+            const sy = s.y + .038 * cos(now / (s.r + 2) + i * 1.7);
+            const dx = px - sx, dy = py - sy;
+            const d = dx * dx + dy * dy;
+            // each source is periodically unavailable; distance becomes a waiting time
+            const phase = (floor((now * 9 + gx * 3 + gy * 5 + i * 17) / s.r) + i) % 5;
+            const defer = phase === 0 ? .032 : 0;
+            const score = d + defer;
+            if (score < best) { second = best; best = score; winner = i; }
+            else if (score < second) second = score;
+          }
+          const s = seeds[winner];
+          const edge = constrain((second - best) * 95, 0, 1);
+          const flicker = ((gx * 13 + gy * 7 + floor(now * 7)) % 19 === 0) ? .72 : 1;
+          fill(s.c[0] * (.2 + .72 * edge) * flicker, s.c[1] * (.2 + .72 * edge) * flicker, s.c[2] * (.2 + .72 * edge) * flicker);
+          rect(gx * unit, gy * unit, unit + 1, unit + 1);
+          delays[winner]++;
+        }
+      }
+      blendMode(SCREEN);
+      for (let x = 0; x < width; x += grain.width) for (let y = 0; y < height; y += grain.height) image(grain, x, y);
+      blendMode(BLEND);
+      document.getElementById('readout').textContent = `four claims, periodically deferred · ${cols} × ${rows} cells · t ${now.toFixed(1)}`;
+    }
+
+    function mousePressed() { epoch++; seeds.forEach((s, i) => { s.x = random(.12, .88); s.y = random(.14, .84); s.r = [5, 7, 11, 13][(i + epoch) % 4]; }); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); grain = makeGrain(); }
+  </script>
+</body>
+</html>
