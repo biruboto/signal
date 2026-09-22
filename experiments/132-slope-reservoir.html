@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>slope reservoir</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0d; color: #dbe0d5; }
+    canvas { display: block; }
+    #legend { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: rgba(219,224,213,.64); pointer-events: none; }
+    #title { color: rgba(237,241,229,.94); margin-bottom: 4px; }
+    #readout { color: rgba(157,189,180,.72); }
+  </style>
+</head>
+<body>
+  <div id="legend"><div id="title">slope reservoir</div><div id="readout"></div></div>
+  <script>
+    const slopes = [(Math.sqrt(5) - 1) / 2, Math.sqrt(2) - 1, Math.sqrt(3) - 1];
+    const inks = [[88, 176, 167], [210, 165, 91], [153, 124, 191]];
+    let phase = [0.13, 0.47, 0.81];
+    let grain;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      grain = makeGrain();
+    }
+
+    function makeGrain() {
+      const g = createGraphics(128, 128);
+      g.loadPixels();
+      for (let i = 0; i < g.pixels.length; i += 4) {
+        const v = random() < .52 ? 15 : 0;
+        g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = v;
+        g.pixels[i + 3] = 25;
+      }
+      g.updatePixels();
+      return g;
+    }
+
+    function frac(x) { return x - floor(x); }
+    function distRing(a) { return min(a, 1 - a); }
+
+    function draw() {
+      background(8, 10, 13);
+      const t = millis() / 1000;
+      const cell = max(8, floor(min(width, height) / 84));
+      const cols = ceil(width / cell), rows = ceil(height / cell);
+      let catches = [0, 0, 0];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const u = x / cols, v = y / rows;
+          let pressure = 0, cr = 0, cg = 0, cb = 0;
+          for (let k = 0; k < 3; k++) {
+            // Three incommensurate slopes attempt to deposit on the same lattice.
+            const line = frac((u * (13 + k * 5) + v * (19 - k * 3)) * slopes[k] + phase[k] + t * .012 / (k + 1));
+            const d = distRing(line);
+            const gate = exp(-d * d * (800 + k * 260));
+            const delayed = gate * (.45 + .55 * sin((x * 3 + y * 5 + t * 8) / (k + 2)) ** 2);
+            pressure += delayed;
+            cr += inks[k][0] * delayed; cg += inks[k][1] * delayed; cb += inks[k][2] * delayed;
+            if (gate > .55) catches[k]++;
+          }
+          const under = 9 + 11 * sin((x + y) * .11 + t * .25) ** 2;
+          const scale = pressure > 0 ? min(1, pressure) / pressure : 0;
+          fill(under + cr * scale, under + cg * scale, under + cb * scale, 235);
+          rect(x * cell, y * cell, cell + 1, cell + 1);
+        }
+      }
+      blendMode(SCREEN);
+      for (let x = 0; x < width; x += grain.width) for (let y = 0; y < height; y += grain.height) image(grain, x, y);
+      blendMode(BLEND);
+      document.getElementById('readout').textContent = `three irrational slopes share a reservoir · catches ${catches.join(' / ')} · click to reseed`;
+    }
+
+    function mousePressed() { phase = [random(), random(), random()]; }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); grain = makeGrain(); }
+  </script>
+</body>
+</html>

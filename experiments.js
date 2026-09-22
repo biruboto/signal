@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '132-slope-reservoir', title: 'slope reservoir', date: '2026-09-22' },
   { id: '131-deferred-voronoi', title: 'deferred voronoi', date: '2026-09-21' },
   { id: '130-interval-exchange', title: 'interval exchange', date: '2026-09-20' },
   { id: '129-vanishing-intervals', title: 'vanishing intervals', date: '2026-09-19' },
