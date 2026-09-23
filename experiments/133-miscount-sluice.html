@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>miscount sluice</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #070a0b; color: #d9dfd5; }
+    canvas { display: block; }
+    #legend { position: fixed; left: 22px; bottom: 18px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .075em; color: rgba(217,223,213,.65); pointer-events: none; }
+    #title { color: rgba(240,244,231,.94); margin-bottom: 4px; }
+    #readout { color: rgba(143,190,179,.76); max-width: min(520px, calc(100vw - 44px)); }
+  </style>
+</head>
+<body>
+  <div id="legend"><div id="title">miscount sluice</div><div id="readout"></div></div>
+  <script>
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const inks = [[91, 185, 171], [218, 164, 82], [174, 128, 201]];
+    let offset = 0.137;
+    let grain;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
+      grain = makeGrain();
+    }
+
+    function makeGrain() {
+      const g = createGraphics(96, 96);
+      g.loadPixels();
+      for (let i = 0; i < g.pixels.length; i += 4) {
+        const v = random() < .5 ? 17 : 0;
+        g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = v;
+        g.pixels[i + 3] = 23;
+      }
+      g.updatePixels();
+      return g;
+    }
+
+    function frac(x) { return x - Math.floor(x); }
+    function nearest(x) { return Math.floor(x + .5); }
+
+    function draw() {
+      background(7, 10, 11);
+      const t = millis() / 1000;
+      const cell = Math.max(7, Math.floor(Math.min(width, height) / 90));
+      const cols = Math.ceil(width / cell), rows = Math.ceil(height / cell);
+      let releases = [0, 0, 0];
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = x + y * cols;
+          let r = 8, g = 12, b = 13;
+          let brightness = 0;
+          for (let k = 0; k < 3; k++) {
+            const rate = phi + k * Math.sqrt(k + 2) / 7;
+            const slow = frac(offset + t * .018 / (k + 1));
+            // Two clerks count the same irrational flow: one rounds now, one rounds after a delayed tick.
+            const immediate = nearest((n + slow) * rate);
+            const delayed = nearest((n + slow - .49) * rate);
+            const disagreement = immediate - delayed;
+            const residue = frac((n + slow) * rate);
+            const gate = Math.exp(-Math.pow(residue - .5, 2) * (160 + k * 35));
+            const pulse = disagreement !== 0 ? gate * (.4 + .6 * Math.sin((y * 1.7 - x * .8 + t * 3) / (k + 1)) ** 2) : 0;
+            if (pulse > .11) releases[k]++;
+            r += inks[k][0] * pulse; g += inks[k][1] * pulse; b += inks[k][2] * pulse;
+            brightness += pulse;
+          }
+          const floorLight = 3 + 5 * Math.sin((x * .17 + y * .11 - t * .18)) ** 2;
+          fill(Math.min(255, r + floorLight), Math.min(255, g + floorLight), Math.min(255, b + floorLight), 238);
+          rect(x * cell, y * cell, cell + 1, cell + 1);
+          if (brightness > .74) {
+            fill(246, 239, 204, 110);
+            rect(x * cell + cell * .32, y * cell + cell * .32, Math.max(1, cell * .18), Math.max(1, cell * .18));
+          }
+        }
+      }
+      blendMode(SCREEN);
+      for (let x = 0; x < width; x += grain.width) for (let y = 0; y < height; y += grain.height) image(grain, x, y);
+      blendMode(BLEND);
+      document.getElementById('readout').textContent = `two rounding rituals share an irrational flow · released miscounts ${releases.join(' / ')} · click to change the origin`;
+    }
+
+    function mousePressed() { offset = random(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); grain = makeGrain(); }
+  </script>
+</body>
+</html>
