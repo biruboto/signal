@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>echo cipher</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; overflow: hidden; background: #080a0f; color: #d9e0de; }
+    canvas { display: block; }
+    #legend { position: fixed; left: 22px; bottom: 18px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .07em; color: rgba(211,224,219,.65); pointer-events: none; }
+    #title { color: rgba(240,245,238,.94); margin-bottom: 4px; }
+    #readout { color: rgba(131,198,188,.77); max-width: min(560px, calc(100vw - 44px)); }
+  </style>
+</head>
+<body>
+  <div id="legend"><div id="title">echo cipher</div><div id="readout"></div></div>
+  <script>
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const pigments = [[84, 193, 180], [231, 166, 84], [160, 128, 215]];
+    let origin = 0.217;
+    let grain;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      grain = makeGrain();
+      noStroke();
+    }
+
+    function makeGrain() {
+      const g = createGraphics(80, 80);
+      g.loadPixels();
+      for (let i = 0; i < g.pixels.length; i += 4) {
+        const v = random() < .42 ? 255 : 0;
+        g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = v;
+        g.pixels[i + 3] = 12;
+      }
+      g.updatePixels();
+      return g;
+    }
+
+    function frac(x) { return x - Math.floor(x); }
+    function parity(n) { let p = 0; while (n) { p ^= n & 1; n >>>= 1; } return p; }
+
+    function draw() {
+      background(8, 10, 15);
+      const t = millis() * .00015;
+      const cell = Math.max(6, Math.floor(Math.min(width, height) / 92));
+      const cols = Math.ceil(width / cell), rows = Math.ceil(height / cell);
+      let agreements = 0, betrayals = 0;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const n = x + y * cols + 1;
+          // One cipher reads the address in binary; the other hears it after an irrational delay.
+          const delayed = Math.floor(n * phi + origin * 4096 + t * 80);
+          const a = parity(n);
+          const b = parity(delayed);
+          const agreement = a === b;
+          const phase = frac(n * phi + origin + t);
+          const seam = Math.exp(-Math.pow(phase - .5, 2) * 68);
+          const residue = (n ^ delayed) & 7;
+          const ink = pigments[residue % 3];
+          const pulse = agreement ? .18 + seam * .28 : .38 + seam * .62;
+          if (agreement) agreements++; else betrayals++;
+          const floor = 8 + 7 * Math.sin(x * .23 - y * .17 + t * 4) ** 2;
+          const r = floor + ink[0] * pulse, g = floor + ink[1] * pulse, bcol = floor + ink[2] * pulse;
+          fill(r, g, bcol, agreement ? 192 : 238);
+          rect(x * cell, y * cell, cell + 1, cell + 1);
+          if (!agreement && seam > .74) {
+            fill(252, 243, 204, 155);
+            rect(x * cell + cell * .34, y * cell + cell * .34, Math.max(1, cell * .28), Math.max(1, cell * .28));
+          }
+        }
+      }
+      blendMode(SCREEN);
+      for (let x = 0; x < width; x += grain.width) for (let y = 0; y < height; y += grain.height) image(grain, x, y);
+      blendMode(BLEND);
+      document.getElementById('readout').textContent = `a binary address replies to its irrational echo · concord ${agreements} · broken syllables ${betrayals} · click to reseed the delay`;
+    }
+
+    function mousePressed() { origin = random(); }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); grain = makeGrain(); }
+  </script>
+</body>
+</html>
