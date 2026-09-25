@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phase Lending</title>
+<style>html,body{margin:0;background:#090c10;color:#c9d3d1;font:13px ui-monospace,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:24px;top:20px;pointer-events:none;letter-spacing:.08em}.note strong{display:block;color:#e2b978;font-weight:400;margin-bottom:7px}.note span{color:#84918f}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div class="note"><strong>PHASE LENDING / 135</strong><span id="readout">two clocks approach; only the slower may borrow</span></div>
+<script>
+let t=0, borrowers=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);}
+function draw(){background(9,12,16);translate(width/2,height/2);let scale=min(width,height)*.34;noFill();
+  // Two nearly commensurate oscillators draw separate paths; near-coincidences transfer a finite phase loan.
+  let a=2*PI/47,b=2*PI/29+0.0009, beat=abs(sin(t*(a-b)/2));
+  stroke(40,62,65,110);strokeWeight(1);ellipse(0,0,scale*2,scale*2);
+  let x1=cos(t*a)*scale*.78,y1=sin(t*a)*scale*.78,x2=cos(t*b+1.2)*scale*.52,y2=sin(t*b+1.2)*scale*.52;
+  stroke(92,164,151,170);line(x1,y1,x2,y2);
+  for(let i=0;i<180;i++){let q=i/180,phase=t*(a+(b-a)*q),r=scale*(.15+.75*q),borrow=0;for(const p of borrowers){let age=t-p.t;if(age<220)borrow+=p.amp*Math.exp(-age/75)*sin(age*.085+p.phase)}let x=cos(phase+borrow)*r,y=sin(phase+borrow)*r;let glow=70+150*(.5+.5*sin(t*.012+i*.11));stroke(130+glow*.35,145+glow*.22,115+glow*.1,90);point(x,y);}
+  noStroke();fill(226,185,120);circle(x1,y1,5);fill(119,174,170);circle(x2,y2,5);
+  if(frameCount%70===0&&beat<.035){borrowers.push({t,amp:.06+beat*1.5,phase:random(TWO_PI)});document.getElementById('readout').textContent=`near alignment ${floor(1000*beat)} / phase loan released / ${borrowers.length} unsettled`;}
+  borrowers=borrowers.filter(p=>t-p.t<220);t+=.7;
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
+</script></body></html>

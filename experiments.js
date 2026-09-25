@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '135-phase-lending', title: 'phase lending', date: '2026-09-25' },
   { id: '134-echo-cipher', title: 'echo cipher', date: '2026-09-24' },
   { id: '133-miscount-sluice', title: 'miscount sluice', date: '2026-09-23' },
   { id: '132-slope-reservoir', title: 'slope reservoir', date: '2026-09-22' },
