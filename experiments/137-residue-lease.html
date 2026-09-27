@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Residue Lease</title>
+<style>html,body{margin:0;background:#090b10;color:#aeb6c6;font:12px ui-monospace,monospace;overflow:hidden}canvas{display:block}#note{position:fixed;left:22px;bottom:18px;letter-spacing:.08em;opacity:.72}#readout{position:fixed;right:22px;top:18px;text-align:right;line-height:1.7;color:#77839a}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head>
+<body><div id="readout"></div><div id="note">RESIDUE LEASE — click to renew the terms</div><script>
+let tick=0, lease=0, cells=[], cols, rows, spacing=18;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1); rebuild();}
+function rebuild(){spacing=constrain(floor(min(width,height)/34),12,23);cols=floor(width/spacing);rows=floor(height/spacing);cells=Array.from({length:cols*rows},()=>0);background(9,11,16)}
+function draw(){background(9,11,16,34); tick++; let a=31+lease*2,b=47+lease*2;
+ // Two clocks accrue residue; only their overdue difference is allowed to leave a trace.
+ for(let k=0;k<Math.max(1,floor(cols*rows/85));k++){
+   let n=(tick*(k+3)+k*k*13+lease*97)%(cols*rows), x=n%cols,y=floor(n/cols);
+   let ra=(tick*(k+5)+lease*11)%a, rb=(tick*(k+7)+k*3)%b;
+   let gap=abs(ra/a-rb/b), debt=floor(gap*7);
+   if(debt>2) cells[n]=min(1,cells[n]+.08);
+ }
+ noStroke();for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+   let i=y*cols+x,v=cells[i];if(v>.025){let pulse=.65+.35*sin(tick*.025+x*.16-y*.11);fill(112+v*90,153+v*35,190+v*50,180*v*pulse);circle(x*spacing+spacing/2,y*spacing+spacing/2,1.2+v*spacing*.48);cells[i]*=.994;}
+ }
+ // occasional seam: the unpaid portions align, then fall quiet
+ if(tick%420===0){for(let i=0;i<cells.length;i++)cells[i]*=.58;}
+ document.getElementById('readout').textContent=`terms ${a} : ${b}\ncycle ${tick} / owed traces ${cells.filter(v=>v>.1).length}`;
+}
+function mousePressed(){lease=(lease+1)%8;tick=0;cells.fill(0)}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);rebuild()}
+</script></body></html>
