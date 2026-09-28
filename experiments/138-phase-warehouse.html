@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>phase warehouse — signal</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090d12;color:#d4dedb;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}canvas{display:block}#readout{position:fixed;left:22px;top:18px;letter-spacing:.12em;text-transform:uppercase;color:#d7e4dc}#note{position:fixed;left:22px;bottom:18px;color:#80918c;max-width:340px}
+</style>
+</head>
+<body>
+<div id="readout">phase warehouse / loading</div>
+<div id="note">Each chamber stores the phase it cannot spend. Click to rotate the exchange rate.</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script>
+const readout=document.getElementById('readout');
+let chambers=[],tick=0,rate=7,cols=0,rows=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);noStroke();build();}
+function build(){cols=Math.max(8,Math.floor(width/28));rows=Math.max(8,Math.floor(height/28));chambers=Array.from({length:cols*rows},(_,i)=>({phase:(i*13+Math.floor(i/cols)*7)%rate,debt:0}));}
+function draw(){background(9,13,18);const cw=width/cols,ch=height/rows;let charged=0;
+for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){let i=y*cols+x,c=chambers[i];if(tick%rate===0){let donor=chambers[y*cols+(x+cols-1)%cols];if((donor.phase+x+y)%3===0){c.debt=Math.min(8,c.debt+1);donor.debt=Math.max(0,donor.debt-1)}}c.phase=(c.phase+1)%rate;let glow=(c.phase/rate)*.52+c.debt*.055;charged+=c.debt;fill(29+glow*70,65+glow*105,74+glow*95,180);rect(x*cw+2,y*ch+2,cw-4,ch-4,2);if(c.debt){fill(205,190,139,70+c.debt*18);circle(x*cw+cw/2,y*ch+ch/2,Math.min(cw,ch)*(.16+c.debt*.055));}}
+tick++;readout.textContent=`phase warehouse / rate ${rate} / stored units ${charged} / cycle ${Math.floor(tick/rate)}`;
+}
+function mousePressed(){rate=rate===11?5:rate+2;tick=0;build();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+</script>
+</body>
+</html>
