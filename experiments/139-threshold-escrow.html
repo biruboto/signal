@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Threshold Escrow — Signal</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b10;color:#d5d2c8;font-family:ui-monospace,SFMono-Regular,monospace}canvas{display:block}.label{position:fixed;left:22px;top:20px;pointer-events:none}.label strong{font-size:12px;font-weight:400;letter-spacing:.18em;text-transform:uppercase}.label p{margin:8px 0;color:#82878c;font-size:11px;line-height:1.6;max-width:270px}.readout{position:fixed;right:22px;bottom:18px;color:#82878c;font-size:10px;letter-spacing:.08em;pointer-events:none}.hint{position:fixed;right:22px;top:20px;color:#626970;font-size:10px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+<div class="label"><strong>139 / threshold escrow</strong><p>Two irrational clocks miss the same boundary.<br>Their unpaid fractions are held here, then released.</p></div><div class="hint">click to change the toll</div><div class="readout" id="readout"></div>
+<script>
+let toll=0.61803398875, rows=[], tick=0, escrow=0, released=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);textFont('monospace');build();}
+function build(){rows=[];let n=130, a=0,b=0,bank=0;for(let i=0;i<n;i++){a=(a+0.7548776662)%1;b=(b+0.5698402910)%1;let pressure=(a+b)/2;bank+=pressure-toll;let pay=bank>=0.72?1:bank<=-0.72?-1:0;if(pay)bank-=pay*0.72;rows.push({a,b,bank,pay,pressure});}escrow=bank;released=rows.filter(x=>x.pay).length;}
+function draw(){background(9,11,16);let left=min(92,width*.12),right=width-34,top=height*.19,bottom=height*.84;let cell=(right-left)/rows.length;noStroke();for(let i=0;i<rows.length;i++){let r=rows[i],x=left+i*cell;let y=map(r.pressure,0,1,bottom,top);let h=map(abs(r.bank),0,.72,2,34);fill(98,133,145,65);rect(x,y, max(1,cell*.55),bottom-y);fill(r.pay>0?224: r.pay<0?174:119,r.pay?174:190,r.pay?112:183, r.pay?220:115);circle(x+cell*.27,y, r.pay?5:2.2);if(r.pay){stroke(209,178,116,115);strokeWeight(1);line(x+cell*.27,y,x+cell*.27,y+(r.pay>0?1:-1)*h);noStroke();}}stroke(85,94,102,80);line(left,top+(bottom-top)*toll,right,top+(bottom-top)*toll);noStroke();fill(121,129,135);textSize(10);text('shared boundary',left,top+(bottom-top)*toll-8);fill(172,177,175);textSize(11);text('0',left-16,bottom+5);text('1',left-16,top+4);document.getElementById('readout').textContent=`${rows.length} crossings · ${released} releases · balance ${escrow>=0?'+':''}${escrow.toFixed(3)} · toll ${toll.toFixed(3)}`;tick++;}
+function mousePressed(){toll=(toll+0.037)%0.91+0.045;build();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script>
+</body></html>
