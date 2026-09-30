@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Coprime Afterimage — Signal</title><style>*{box-sizing:border-box}html,body{margin:0;background:#090b0c;color:#bec4bd;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}#note{position:fixed;left:22px;bottom:18px;pointer-events:none;letter-spacing:.04em}#note strong{font-weight:400;color:#e0d6b8}#note span{display:block;color:#717b76;margin-top:3px}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div id="note"><strong>140 / coprime afterimage</strong><span id="readout">two counters depart; only shared absences leave a trace</span></div><script>
+let a=0,b=0,frame=0,marks=[];const steps=[17,29],mod=97;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(9,11,12);}
+function draw(){background(9,11,12,18);translate(width/2,height/2);let scale=min(width,height)*.39;noFill();strokeWeight(1);
+ for(let i=0;i<2;i++){let v=i===0?a:b, hue=i===0?155:36;stroke(hue===155?81:110,hue===155?139:119,hue===155?123:73,105);let theta=TWO_PI*v/mod;let r=scale*(.38+.23*sin(v*.19+i));let x=cos(theta)*r,y=sin(theta)*r;line(0,0,x,y);noStroke();fill(hue===155?140:205,hue===155?190:166,hue===155?154:110,190);circle(x,y,3.2);}
+ if(frame%2===0){let same=(a%mod)===(b%mod);let d=(a-b+mod*10)%mod;if(same||d===1||d===mod-1){let t=TWO_PI*(a%mod)/mod;marks.push({x:cos(t)*scale*.52,y:sin(t)*scale*.52,age:0,kind:same});}a=(a+steps[0])%mod;b=(b+steps[1])%mod;}
+ noFill();for(let m of marks){m.age++;stroke(m.kind?200:130,m.kind?176:163,m.kind?121:146,max(0,85-m.age*.23));circle(m.x,m.y,3+m.age*.16);}marks=marks.filter(m=>m.age<350);frame++;
+ if(frame%25===0)document.getElementById('readout').textContent=`17 and 29 over 97 · near-meetings ${marks.length} · click to exchange one step`;
+}
+function mousePressed(){if(mouseX>width/2-12&&mouseX<width/2+12&&mouseY>height/2-12&&mouseY<height/2+12){let t=steps[0];steps[0]=steps[1];steps[1]=t;}else{steps[0]=steps[0]===17?19:17;}}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
