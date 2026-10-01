@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Remainder Lantern — Signal</title><style>*{box-sizing:border-box}html,body{margin:0;background:#090b0d;color:#c6c6b8;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}#note{position:fixed;left:22px;bottom:18px;pointer-events:none;letter-spacing:.04em}#note strong{font-weight:400;color:#dfd4ae}#note span{display:block;color:#75807e;margin-top:3px}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div id="note"><strong>141 / remainder lantern</strong><span id="readout">division remembers what the quotient discards · click to change the base</span></div><script>
+let base=11, numerators=[1,2,3,4,5,6,7,8,9,10], trails=[], tick=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(9,11,13);}
+function draw(){background(9,11,13,30);translate(width/2,height/2);let radius=min(width,height)*.38;noFill();strokeWeight(1);
+  for(let j=0;j<numerators.length;j++){let n=numerators[j],r=0;for(let k=0;k<tick%base+1;k++)r=(r*base+n)%base;let angle=TWO_PI*j/numerators.length-TWO_PI*r/base;let reach=radius*(.32+.56*(r+1)/base),x=cos(angle)*reach,y=sin(angle)*reach;let c=j%2?154:205;stroke(c,j%2?161:174,j%2?127:112,110);line(cos(angle)*radius*.12,sin(angle)*radius*.12,x,y);noStroke();fill(c,j%2?174:190,j%2?140:120,185);circle(x,y,2.4+3*(r===0));if(tick%4===0)trails.push({x,y,age:0,h:c});}
+  noFill();for(let p of trails){p.age++;stroke(p.h,170,130,max(0,75-p.age*.3));circle(p.x,p.y,2+p.age*.12);}trails=trails.filter(p=>p.age<240);tick++;
+  if(tick%45===0)document.getElementById('readout').textContent=`base ${base} · ${numerators.length} fractions · each ray marks the remainder after ${tick%base+1} steps · click to alter the base`;
+}
+function mousePressed(){base=base===11?13:base===13?17:11;trails=[];tick=0;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
