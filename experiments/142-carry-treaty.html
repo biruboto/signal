@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>carry treaty</title>
+<style>
+html,body{margin:0;background:#090b10;color:#d5d6cf;font:12px ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.label{position:fixed;left:24px;top:22px;letter-spacing:.12em;text-transform:uppercase;opacity:.72}.note{position:fixed;left:24px;bottom:22px;opacity:.55}.read{position:fixed;right:24px;top:22px;text-align:right;line-height:1.7;opacity:.72}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head><body>
+<div class="label">142 / carry treaty</div><div class="read" id="readout">three clocks negotiating a shared remainder</div><div class="note">click to restart · rounding debts are not erased, only reassigned</div>
+<script>
+let clocks=[], marks=[], tick=0, palette=['#d7b56d','#72aaa0','#bf7890'];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);reset();}
+function reset(){clocks=[{step:Math.sqrt(2),phase:0,debt:0},{step:Math.sqrt(3),phase:0,debt:0},{step:(1+Math.sqrt(5))/2,phase:0,debt:0}];marks=[];tick=0;background('#090b10');}
+function draw(){background(9,11,16,23);let cx=width/2,cy=height/2,scale=min(width,height)*.32;
+ for(let j=0;j<clocks.length;j++){let c=clocks[j];c.phase+=c.step;let whole=Math.floor(c.phase),frac=c.phase-whole;c.debt+=frac-.5;
+  if(frac< c.step%1){let ang=tick*.027+j*TWO_PI/3;let r=scale*(.54+j*.14);let x=cx+cos(ang)*r,y=cy+sin(ang)*r; marks.push({x,y,j,life:255,weight:abs(c.debt)});}
+  let a=tick*.011+j*TWO_PI/3;noFill();stroke(palette[j]+'55');strokeWeight(1);ellipse(cx,cy,scale*(1.08+j*.28));stroke(palette[j]+'aa');point(cx+cos(a)*scale*(.54+j*.14),cy+sin(a)*scale*(.54+j*.14));
+ }
+ // A settlement occurs when two clocks' signed debts nearly cancel: the unpaid half-units are lent, not deleted.
+ let pair=clocks[0].debt+clocks[1].debt+clocks[2].debt;if(abs(pair)<.035 && tick>20){let x=cx+random(-12,12),y=cy+random(-12,12);marks.push({x,y,j:3,life:240,weight:1.8});for(let c of clocks)c.debt*=.94;}
+ noStroke();for(let m of marks){let col=m.j===3?'#eee6d0':palette[m.j];fill(col+hex(floor(m.life).toString(16).padStart(2,'0')).slice(-2));circle(m.x,m.y,1+min(5,m.weight*1.2));m.life-=.65;}
+ marks=marks.filter(m=>m.life>0);tick++;
+ document.getElementById('readout').textContent=`ledger ${String(tick).padStart(5,'0')} · net rounding debt ${pair.toFixed(3)} · ${marks.length} unsettled marks`;
+}
+function mousePressed(){reset();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background('#090b10');}
+</script></body></html>

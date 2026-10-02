@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '142-carry-treaty', title: 'carry treaty', date: '2026-10-02' },
   { id: '141-remainder-lantern', title: 'remainder lantern', date: '2026-10-01' },
   { id: '140-coprime-afterimage', title: 'coprime afterimage', date: '2026-09-30' },
   { id: '139-threshold-escrow', title: 'threshold escrow', date: '2026-09-29' },  { id: '138-phase-warehouse', title: 'phase warehouse', date: '2026-09-28' },  { id: '137-residue-lease', title: 'residue lease', date: '2026-09-27' },  { id: '136-erasure-cartographer', title: 'erasure cartographer', date: '2026-09-26' },
