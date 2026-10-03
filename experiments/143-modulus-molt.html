@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>modulus molt</title>
+<style>html,body{margin:0;background:#080b0e;color:#d9d8cb;font:12px ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.label{position:fixed;left:22px;top:20px;letter-spacing:.14em;text-transform:uppercase;opacity:.68}.read{position:fixed;right:22px;top:20px;text-align:right;line-height:1.7;opacity:.7}.note{position:fixed;left:22px;bottom:20px;opacity:.52}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body>
+<div class="label">143 / modulus molt</div><div class="read" id="readout">a residue sheds its container when it overflows</div><div class="note">click to shed the current shell · each shell inherits the last remainder</div>
+<script>
+let shell=17, residue=0, age=0, total=0, trail=[], shells=[], drift=Math.SQRT2;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background('#080b0e');}
+function draw(){background(8,11,14,32);let cx=width/2,cy=height/2,R=min(width,height)*.34;
+  // The input advances irrationally; the modulus grows only when accumulated residue crosses its wall.
+  residue+=drift;let overflow=false;
+  while(residue>=shell){residue-=shell;overflow=true;}
+  age++;total++;
+  if(overflow){shells.push({n:shell,at:total%600,fade:255});shell=Math.min(79,shell+2+(total%3));age=0;}
+  let phase=residue/shell*TWO_PI, radius=R*(.42+.52*shell/79), x=cx+cos(phase)*radius,y=cy+sin(phase)*radius;
+  trail.push({x,y,life:255,band:shell});if(trail.length>1500)trail.shift();
+  noFill();for(let i=0;i<shells.length;i++){let s=shells[i];stroke(104,148,143,35);strokeWeight(1);ellipse(cx,cy,R*(.35+.62*s.n/79)*2);s.fade-=.12;}shells=shells.filter(s=>s.fade>0);
+  noStroke();for(let p of trail){let a=p.life;fill(211,177,112,a);circle(p.x,p.y,1+2*p.life/255);p.life-=.8;}
+  stroke('#c7e0c3');strokeWeight(1.5);point(x,y);
+  noStroke();fill('#d9d8cb');circle(cx,cy,2);
+  document.getElementById('readout').textContent=`shell ${String(shell).padStart(2,'0')} · remainder ${residue.toFixed(3)} / ${shell} · molt ${total}`;
+}
+function mousePressed(){shell=Math.min(79,shell+2);residue=residue%shell;age=0;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background('#080b0e');}
+</script></body></html>

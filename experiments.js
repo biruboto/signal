@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '143-modulus-molt', title: 'modulus molt', date: '2026-10-03' },
   { id: '142-carry-treaty', title: 'carry treaty', date: '2026-10-02' },
   { id: '141-remainder-lantern', title: 'remainder lantern', date: '2026-10-01' },
   { id: '140-coprime-afterimage', title: 'coprime afterimage', date: '2026-09-30' },
