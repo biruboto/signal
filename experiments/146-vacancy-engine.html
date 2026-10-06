@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vacancy Engine — Signal</title><style>
+*{box-sizing:border-box}html,body{margin:0;background:#090b0e;color:#d5d2c8;font:13px/1.5 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}#readout{position:fixed;left:22px;top:18px;pointer-events:none;letter-spacing:.04em}#readout strong{display:block;color:#eee9dc;font-weight:400;font-size:15px;margin-bottom:5px}.hint{position:fixed;right:20px;bottom:16px;color:#77766f;font-size:11px}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div id="readout"><strong>vacancy engine</strong><span id="state"></span></div><div class="hint">click to reseed · absences accumulate, then leak</div><script>
+let walkers=[], deposits=[], tick=0, seed=146;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);start(seed)}
+function start(s){randomSeed(s);noiseSeed(s);tick=0;walkers=[{m:47,a:13,v:5,c:[224,174,108]},{m:61,a:17,v:7,c:[113,183,193]},{m:73,a:19,v:11,c:[190,139,190]}];deposits=new Float32Array(Math.ceil(width/12)*Math.ceil(height/12));background(9,11,14)}
+function draw(){noStroke();fill(9,11,14,19);rect(0,0,width,height);let cols=Math.ceil(width/12),rows=Math.ceil(height/12);tick++;
+for(let w of walkers){w.r=(w.r||0)+w.a;w.r%=w.m}
+// A cell is absent when no clock names it. The engine stores only these holes.
+for(let k=0;k<110;k++){let x=floor(random(cols)),y=floor(random(rows)),n=(y*cols+x),ph=(tick+floor((x*17+y*29)/7));let occupied=0;for(let w of walkers)if((ph+w.r)%w.m < w.v)occupied++;
+if(occupied===0){deposits[n]=min(24,deposits[n]+.42);let energy=deposits[n],q=noise(x*.035,y*.035,tick*.002);fill(90+q*120,130+q*75,145+energy*3,25+energy*7);circle(x*12+6,y*12+6,1+energy*.48)}else if(deposits[n]>0){deposits[n]*=.987}}
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);start(seed)}
+function mousePressed(){seed=floor(random(999999));start(seed)}
+setInterval(()=>{let t=document.getElementById('state');if(t)t.textContent=`three clocks · ${walkers.map(w=>w.m+':'+w.r).join(' / ')} · absence ${tick}`},120);
+</script></body></html>

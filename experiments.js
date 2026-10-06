@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '146-vacancy-engine', title: 'vacancy engine', date: '2026-10-06' },
   { id: '145-lag-compass', title: 'lag compass', date: '2026-10-05' },
   { id: '144-prime-shadow', title: 'prime shadow', date: '2026-10-04' },  { id: '143-modulus-molt', title: 'modulus molt', date: '2026-10-03' },  { id: '142-carry-treaty', title: 'carry treaty', date: '2026-10-02' },
   { id: '141-remainder-lantern', title: 'remainder lantern', date: '2026-10-01' },
