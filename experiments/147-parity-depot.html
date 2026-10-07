@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Parity Depot</title><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1012;color:#d5d8ca;font:12px/1.5 ui-monospace,SFMono-Regular,monospace}canvas{display:block}.label{position:fixed;left:22px;top:18px;letter-spacing:.12em;text-transform:uppercase;color:#b1b69f}.note{position:fixed;left:22px;bottom:18px;max-width:390px;color:#8e988e}.count{position:fixed;right:22px;top:18px;color:#8e988e}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div class="label">147 / parity depot</div><div class="count" id="readout">loading</div><div class="note">The Thue–Morse stream arrives one mark at a time. Each rail refuses a mark identical to its last delivery; refused marks wait in a shared queue until a different gate opens. Click to restart.</div><script>
+let streamIndex=0, rails=[{last:null,items:[]},{last:null,items:[]}], queue=[], tick=0, total=0;
+function setup(){createCanvas(windowWidth,windowHeight);frameRate(30);textFont('monospace');}
+function parity(n){let x=0;while(n){x^=n&1;n>>=1}return x;}
+function draw(){background(11,16,18);tick++;if(tick%8===0)arrive();drawDepot();}
+function arrive(){const bit=parity(streamIndex++);queue.push({bit,age:0,from:streamIndex-1});tryDeliver();for(const q of queue)q.age++;total++;document.getElementById('readout').textContent=`input ${total}  ·  waiting ${queue.length}`;}
+function tryDeliver(){let attempts=queue.length;while(attempts--&&queue.length){let q=queue.shift(),first=rails[q.bit],second=rails[1-q.bit],r=first.last!==q.bit?first:(second.last!==q.bit?second:null);if(r){r.last=q.bit;r.items.push({bit:q.bit,age:0,source:q.from});}else queue.push(q);}}
+function drawDepot(){let mid=height*.52, left=width*.16,right=width*.84;stroke(57,69,67);strokeWeight(1);line(left,mid-54,right,mid-54);line(left,mid+54,right,mid+54);noStroke();fill(150,162,144);textAlign(LEFT,CENTER);text('0 / gate',left,mid-78);text('1 / gate',left,mid+78);textAlign(RIGHT,CENTER);text('accepted',right,mid-78);text('accepted',right,mid+78);
+// queue stacks as an in-between pressure column
+fill(190,151,102,110);for(let i=0;i<queue.length;i++){let q=queue[i],x=width*.5+(i%2?1:-1)*Math.floor(i/2)*13,y=mid-4;circle(x,y,6+Math.min(q.age,8)*.35);}
+for(let r=0;r<2;r++){let laneY=mid+(r?54:-54),items=rails[r].items;for(let i=Math.max(0,items.length-48);i<items.length;i++){let a=items[i],age=items.length-1-i,x=right-((age*15+((frameCount*1.2)%15))%(right-left-30));let fade=255-Math.min(age*4,190);fill(r?123:185,r?167:157,r?143:110,fade);circle(x,laneY,6);}}
+noFill();stroke(72,84,77);rectMode(CENTER);rect(width*.5,mid,Math.min(74,width*.18),88,8);noStroke();fill(122,132,117);textAlign(CENTER,CENTER);text('shared\nqueue',width*.5,mid);
+}
+function mousePressed(){streamIndex=0;rails=[{last:null,items:[]},{last:null,items:[]}];queue=[];tick=0;total=0;document.getElementById('readout').textContent='loading';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
