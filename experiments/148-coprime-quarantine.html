@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coprime Quarantine — Signal</title>
+<style>
+html,body{margin:0;background:#090c10;color:#d4ddd9;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;overflow:hidden}canvas{display:block}#readout{position:fixed;left:22px;top:18px;pointer-events:none;letter-spacing:.08em;color:#aabbb2}#note{position:fixed;right:22px;bottom:17px;color:#66766f;pointer-events:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body><div id="readout">COPRIME QUARANTINE · awaiting first crossing</div><div id="note">click to reseed the lattice</div>
+<script>
+let cells=[], n=31, tick=0, seed=148;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);textFont('monospace');build();}
+function build(){randomSeed(seed);cells=[];let cols=max(7,floor(width/35)), rows=max(7,floor(height/35));for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){let a=(x*17+y*11+seed)%n,b=(x*7-y*13+seed*3)%n;cells.push({x,y,a:(a+n)%n,b:(b+n)%n,age:0,mark:random()});}}
+function draw(){background(9,12,16);let cols=max(7,floor(width/35)), rows=max(7,floor(height/35)), cw=width/cols,ch=height/rows;let hits=0,near=0;
+for(const c of cells){let d=(c.a*c.b)%n, cop=gcd(c.a,c.b)===1, crossing=(d===1&&cop); if(crossing){c.age=min(1,c.age+.055);hits++;}else c.age*=.994;if(cop)near++;let x=(c.x+.5)*cw,y=(c.y+.5)*ch;let glow=c.age;noStroke();fill(70+glow*150,115+glow*105,133+glow*100,40+glow*210);circle(x,y,2+glow*min(cw,ch)*.55);if(c.mark>.86&&tick%5===0){stroke(87,112,113,30);line(x,y,x+(c.a-n/2)*cw*.08,y+(c.b-n/2)*ch*.08);}}
+tick++;document.getElementById('readout').textContent=`COPRIME QUARANTINE · n=${n} · inverse crossings ${hits} · eligible pairs ${near}`;}
+function gcd(a,b){while(b){[a,b]=[b,a%b]}return abs(a)}
+function mousePressed(){seed=floor(random(10000));n=[29,31,37,41,43][floor(random(5))];build();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+</script></body></html>
