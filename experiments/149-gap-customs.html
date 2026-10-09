@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gap customs — Signal</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101215;color:#d9d5c9;font:12px/1.5 ui-monospace,SFMono-Regular,monospace}canvas{display:block}.note{position:fixed;left:24px;top:20px;pointer-events:none;letter-spacing:.08em;text-transform:uppercase;color:#a9a394}.caption{position:fixed;left:24px;bottom:20px;color:#77766f;pointer-events:none}.readout{position:fixed;right:24px;top:20px;text-align:right;color:#aaa69b;pointer-events:none}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head>
+<body><div class="note">149 / gap customs</div><div class="readout" id="readout">three irrational routes · loading</div><div class="caption">A landing is admitted only when its waiting-time residue clears the gate. Click to change the gate.</div>
+<script>
+const roots=[Math.sqrt(2)-1,Math.sqrt(3)-1,Math.sqrt(5)-2];
+const names=['√2−1','√3−1','√5−2'];
+let gate=5,step=0,records=[],lastSeen=Array.from({length:3},()=>Array(180).fill(0)),particles=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(16,18,21);for(let r=0;r<3;r++)for(let i=1;i<=180;i++){const x=(i*roots[r])%1,b=Math.floor(x*180),gap=i-lastSeen[r][b],prime=gap>1&&isPrime(gap);records.push({r,i,x,b,gap,prime});lastSeen[r][b]=i;}document.getElementById('readout').textContent=`${records.filter(v=>v.prime).length} admissions · gate ${gate} · click to alter`;}
+function isPrime(n){for(let d=2;d*d<=n;d++)if(n%d===0)return false;return n>1;}
+function draw(){background(16,18,21,38);const left=width*.12,right=width*.88,top=height*.23,bottom=height*.78;stroke(65,66,62,100);strokeWeight(1);for(let i=0;i<=18;i++){let x=lerp(left,right,i/18);line(x,top,x,bottom);}for(let r=0;r<3;r++){let y=lerp(top,bottom,r/2);stroke(70,72,68,110);line(left,y,right,y);noStroke();fill(137,132,118);text(names[r],left-42,y+4);}
+// A moving window exposes the hidden visit sequence; gate is a modular waiting-time test.
+let cursor=Math.floor(frameCount*.45)%records.length;for(let k=0;k<Math.min(260,records.length);k++){let v=records[(cursor+k)%records.length],x=lerp(left,right,v.x),y=lerp(top,bottom,v.r/2),accepted=v.prime&&(v.gap%gate!==0),age=k/260;let alpha=accepted?190:48;noStroke();fill(accepted?205:117,accepted?183:129,accepted?128:140,alpha);let h=accepted?5+Math.min(16,v.gap*.35):2;rect(x-1,y-h/2,2,h);if(accepted&&k%4===0){stroke(202,177,122,55);line(x,y,x,y+(v.gap%13-6)*2);}}
+noStroke();fill(120,118,109,100);text('0',left,bottom+22);text('1',right-5,bottom+22);let accepted=records.filter(v=>v.prime&&(v.gap%gate!==0)).length;document.getElementById('readout').textContent=`${accepted} admissions / 540 visits · gate ${gate} · click to alter`;
+}
+function mousePressed(){gate=gate===5?7:gate===7?11:5;return false;}function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
