@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '150-phase-jury', title: 'phase jury', date: '2026-10-10' },
   { id: '149-gap-customs', title: 'gap customs', date: '2026-10-09' },
   { id: '148-coprime-quarantine', title: 'coprime quarantine', date: '2026-10-08' },
   { id: '147-parity-depot', title: 'parity depot', date: '2026-10-07' },

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>phase jury</title>
+<style>html,body{margin:0;background:#090d10;color:#c8d3cf;font:12px ui-monospace,monospace;overflow:hidden}canvas{display:block}.label{position:fixed;left:24px;top:20px;letter-spacing:.12em;text-transform:uppercase}.note{position:fixed;left:24px;bottom:20px;color:#72837e}.readout{position:fixed;right:24px;top:20px;text-align:right;color:#91aaa0}</style></head>
+<body><div class="label">150 / phase jury</div><div class="readout" id="readout"></div><div class="note">three clocks cast residues; only a pairwise majority leaves a trace · click to change modulus</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script><script>
+let moduli=[89,97,101], rates=[17,29,43], phases=[0,0,0], age=0, marks=[], lastVote='';
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);colorMode(HSB,360,100,100,100);background(195,40,5);}
+function draw(){background(195,40,5,13);translate(width/2,height/2);let R=min(width,height)*.34; noFill();
+ for(let k=0;k<3;k++){stroke([175,38,296][k],35,60,20);strokeWeight(1);ellipse(0,0,R*(.72+k*.18)*2);let a=phases[k]/moduli[k]*TWO_PI-HALF_PI;stroke([175,38,296][k],55,88,85);line(cos(a)*R*(.72+k*.18),sin(a)*R*(.72+k*.18),cos(a)*(R*(.72+k*.18)+8),sin(a)*(R*(.72+k*.18)+8));}
+ for(let m of marks){let alpha=map(age-m.t,0,1800,55,0,true);stroke(m.h,55,88,alpha);strokeWeight(m.w);line(cos(m.a)*m.r,sin(m.a)*m.r,cos(m.b)*m.r,sin(m.b)*m.r);}
+ if(frameCount%3===0)step(); document.getElementById('readout').textContent=`n = ${moduli[0]}   /   ${age.toLocaleString()} trials\nlatest majority: ${lastVote||'—'}`;
+}
+function step(){age++;for(let k=0;k<3;k++)phases[k]=(phases[k]+rates[k])%moduli[k];let p=phases.map((v,k)=>v/moduli[k]*TWO_PI-HALF_PI), pairs=[[0,1],[1,2],[2,0]];let best=null, gap=Infinity;
+ for(let [a,b] of pairs){let d=abs(atan2(sin(p[a]-p[b]),cos(p[a]-p[b])));if(d<gap){gap=d;best=[a,b];}}
+ // A close pair is a temporary majority; the outlier is the dissenting clock.
+ if(gap<.105){let [a,b]=best;let out=3-a-b;marks.push({t:age,a:p[a],b:p[b],r:min(width,height)*(.17+.035*out),h:[175,38,296][out],w:1+out*.5});lastVote=`${['A','B','C'][a]} + ${['A','B','C'][b]} / dissent ${['A','B','C'][out]}`;if(marks.length>700)marks.splice(0,100);}}
+function mousePressed(){let choices=[89,97,101,107,113];let i=choices.indexOf(moduli[0]);let n=choices[(i+1)%choices.length];moduli=[n,n+8,n+12];phases=[0,0,0];marks=[];age=0;lastVote='';background(195,40,5);}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(195,40,5);}
+</script></body></html>
