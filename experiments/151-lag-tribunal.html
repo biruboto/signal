@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lag Tribunal — Signal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+html,body{margin:0;background:#090b10;color:#d8d2c4;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;overflow:hidden}canvas{display:block}#readout{position:fixed;left:24px;top:22px;letter-spacing:.12em;text-transform:uppercase;color:#d7cdb7}#note{position:fixed;left:24px;bottom:20px;color:#7f8490;max-width:390px}#hint{position:fixed;right:24px;bottom:20px;color:#68717e}
+</style></head>
+<body><div id="readout">LAG TRIBUNAL · waiting for testimony</div><div id="note">Three clocks testify by arriving late. When claims coincide, the quieter clock inherits the interval.</div><div id="hint">click to reshuffle the clocks</div>
+<script>
+let clocks=[],events=[],serial=0,origin,colors=['#d89b73','#80b8b2','#aaa2d3'];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);textFont('monospace');reset();}
+function reset(){clocks=[{p:83,lag:0,rate:1.0,color:colors[0]},{p:127,lag:0,rate:0.73,color:colors[1]},{p:191,lag:0,rate:0.51,color:colors[2]}];events=[];serial=0;origin=millis();}
+function draw(){background(9,11,16);let now=(millis()-origin)/1000;let cx=width*.5,cy=height*.53,rad=min(width,height)*.29;
+  // A ring is a clock face without numerals: each orbit marks elapsed time modulo its private period.
+  noFill();stroke(35,40,50);strokeWeight(1);for(let r of [.38,.63,.88,1])ellipse(cx,cy,rad*2*r,rad*2*r);
+  for(let i=0;i<clocks.length;i++){let c=clocks[i],phase=(now*c.rate+c.lag)% (c.p/100);let a=phase/(c.p/100)*TWO_PI-HALF_PI;let rr=rad*(.42+i*.22);stroke(c.color);strokeWeight(1.2);let x=cx+cos(a)*rr,y=cy+sin(a)*rr;line(cx,cy,x,y);noStroke();fill(c.color);circle(x,y,5);}
+  for(let k=events.length-1;k>=0;k--){let e=events[k],age=now-e.t;if(age>8){events.splice(k,1);continue;}let r=rad*(.1+age/8*.92);noFill();stroke(e.col+(floor((1-age/8)*150).toString(16).padStart(2,'0')));strokeWeight(1);circle(cx,cy,r*2);}
+  if(frameCount%10===0){let winner=floor(random(3)),c=clocks[winner];let t=now;events.push({t,col:c.color});c.lag=(c.lag+random(.07,.48))%(c.p/100);serial++;document.getElementById('readout').textContent=`LAG TRIBUNAL · claim ${String(serial).padStart(4,'0')} · clock ${winner+1} inherits +${c.lag.toFixed(2)}s`;}
+  // faint evidence marks left where asynchronous claims have passed
+  fill(105,112,125);noStroke();textSize(10);textAlign(CENTER);text('INTERVALS ARE NOT OWNED',cx,height-42);
+}
+function mousePressed(){reset();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
