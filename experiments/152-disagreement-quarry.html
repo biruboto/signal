@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Disagreement Quarry</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b0d;color:#c9c6b8;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}.label{position:fixed;z-index:2;left:24px;top:20px;letter-spacing:.13em;text-transform:uppercase;color:#d8d1b9}.note{position:fixed;right:24px;bottom:20px;color:#77796f;text-align:right}.readout{position:fixed;left:24px;bottom:20px;color:#a39c85}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head>
+<body><div class="label">152 / disagreement quarry</div><div id="readout" class="readout">two clocks begin with the same stone</div><div class="note">click to exchange clock ratios<br>the remainder is the chisel</div>
+<script>
+let a=17,b=29,step=0,marks=[],cx,cy,scale;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(9,11,13);cx=width/2;cy=height/2;scale=min(width,height)*.39;strokeCap(ROUND);}
+function draw(){background(9,11,13,20);translate(cx,cy);noFill();let n=180;let phaseA=(step*a)%n,phaseB=(step*b)%n;let mismatch=(phaseA-phaseB+n)%n;let tension=min(mismatch,n-mismatch)/n;
+// strata: repeated circular ledges, locally removed where clocks fail to align
+for(let ring=0;ring<38;ring++){let r=scale*(.12+ring/42);beginShape();for(let i=0;i<=n;i++){let t=TWO_PI*i/n;let ca=(i* a+ring*7)%n, cb=(i*b+ring*11)%n;let d=abs(ca-cb);d=min(d,n-d);let cut= d < 2+ tension*8 && ((i+ring+step)%5!==0);let wobble=sin(i*.11+ring*.7+step*.015)*scale*.002;let rr=r+wobble-(cut?scale*.012:0);vertex(cos(t)*rr,sin(t)*rr);}endShape();}
+// two clock needles and their uncancelled angular difference
+let aa=TWO_PI*phaseA/n-HALF_PI,ab=TWO_PI*phaseB/n-HALF_PI;stroke(220,185,122,150);strokeWeight(1);line(0,0,cos(aa)*scale*.19,sin(aa)*scale*.19);stroke(132,177,169,150);line(0,0,cos(ab)*scale*.19,sin(ab)*scale*.19);noStroke();fill(220,185,122);circle(cos(aa)*scale*.19,sin(aa)*scale*.19,3);fill(132,177,169);circle(cos(ab)*scale*.19,sin(ab)*scale*.19,3);step++;if(frameCount%12===0)document.getElementById('readout').textContent=`clock A ${a} · clock B ${b} · mismatch ${mismatch} / ${n} · chisel ${tension.toFixed(2)}`;}
+function mousePressed(){let pairs=[[19,31],[23,37],[29,47],[17,41],[31,53],[a,b]];let next=pairs[(pairs.findIndex(p=>p[0]===a&&p[1]===b)+1)%pairs.length];a=next[0];b=next[1];step=0;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);cx=width/2;cy=height/2;scale=min(width,height)*.39;}
+</script></body></html>
