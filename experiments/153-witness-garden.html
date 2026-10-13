@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Witness Garden</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090d12;color:#d8d6c9;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}canvas{display:block}#label{position:fixed;left:22px;top:18px;pointer-events:none;letter-spacing:.08em;text-transform:uppercase;color:#a6b6ae}#note{position:fixed;left:22px;bottom:18px;max-width:390px;color:#818c88;pointer-events:none}#note strong{display:block;color:#d8d6c9;font-weight:400;margin-bottom:5px}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head><body><div id="label">153 / witness garden</div><div id="note"><strong id="readout">A claim grows only where independent witnesses overlap.</strong>Click to reseed the witnesses. Their testimony is local; the pale seams are agreement, not certainty.</div>
+<script>
+let seeds=[], field=[], cell=9, phase=0, salt=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);noStroke();build();}
+function build(){cell=max(6,min(12,floor(min(width,height)/70)));seeds=[];for(let i=0;i<7;i++)seeds.push({x:random(width),y:random(height),r:random(45,min(width,height)*.38),bias:random()});field=[];for(let y=0;y<height;y+=cell)for(let x=0;x<width;x+=cell){let votes=0,weight=0;for(let i=0;i<seeds.length;i++){let s=seeds[i],d=dist(x,y,s.x,s.y)/s.r;let local=sin(d*6.1+i*1.7+salt)*.5+.5;let trust=1/(1+d*d*.35);votes+=(local>s.bias?1:-1)*trust;weight+=trust;}field.push({x,y,v:abs(votes/weight),sign:sign(votes)});}}
+function draw(){background(9,13,18);phase+=.006;for(let p of field){let shimmer=.5+.5*sin(phase*2+p.x*.009-p.y*.006);let agreement=constrain(p.v,0,1);let alpha=18+agreement*90*shimmer;fill(p.sign>0?104:62,p.sign>0?171:115,p.sign>0?149:143,alpha);rect(p.x,p.y,cell-1,cell-1);if(agreement>.77&&((p.x/cell+p.y/cell)%5<1)){fill(218,210,168,35+agreement*75);rect(p.x,p.y,cell-1,cell-1);}}for(let i=0;i<seeds.length;i++){let s=seeds[i];noFill();stroke(127,154,143,23);circle(s.x,s.y,s.r*2);noStroke();fill(202,194,156,110);circle(s.x,s.y,3);}}
+function mousePressed(){salt+=random(1,8);build();document.getElementById('readout').textContent='Witnesses relocated. The old agreement has no jurisdiction here.';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);build();}
+</script></body></html>
