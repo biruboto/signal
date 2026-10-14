@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '154-residue-wake', title: 'residue wake', date: '2026-10-14' },
   { id: '153-witness-garden', title: 'witness garden', date: '2026-10-13' },
   { id: '152-disagreement-quarry', title: 'disagreement quarry', date: '2026-10-12' },  { id: '151-lag-tribunal', title: 'lag tribunal', date: '2026-10-11' },  { id: '150-phase-jury', title: 'phase jury', date: '2026-10-10' },
   { id: '149-gap-customs', title: 'gap customs', date: '2026-10-09' },

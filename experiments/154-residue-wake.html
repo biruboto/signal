@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>residue wake</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080b10;color:#b8c7d3;font:12px/1.5 ui-monospace,SFMono-Regular,monospace}canvas{display:block}.label{position:fixed;left:24px;top:20px;letter-spacing:.14em;text-transform:uppercase;color:#d3dedf}.note{position:fixed;left:24px;bottom:20px;color:#788a96;max-width:360px}#readout{color:#c6a875}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body><div class="label">154 / residue wake</div><div class="note" id="readout">A sequence leaves a wake where its returns almost coincide. Click to exchange the drift.</div>
+<script>
+let drift=0.6180339887, seeds=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(8,11,16);for(let i=0;i<96;i++)seeds.push((i*0.6180339887)%1);noLoop();draw();}
+function draw(){background(8,11,16);translate(width/2,height/2);let scale=Math.min(width,height)*.43;strokeWeight(1);
+ for(let i=0;i<seeds.length;i++){let t=seeds[i], a=TWO_PI*t, r=scale*(.12+.82*t);let q=(t*137.507+drift*1000)%1;let near=Math.min(q,1-q);let x=cos(a)*r,y=sin(a)*r;let reach=scale*(.025+.13*(1-near));let hue=map(near,0,.5,225,35);stroke(hue,190,210,35+180*(1-near));line(x,y,x+cos(a+drift*6)*reach,y+sin(a+drift*6)*reach);noStroke();fill(185,205,205,35+180*(1-near));circle(x,y,1.2+3*(1-near));}
+}
+function mousePressed(){drift=(drift+.037111)%1;redraw();document.getElementById('readout').textContent='Drift '+drift.toFixed(6)+' — near-returns brighten; the wake is never the orbit.';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);redraw();}
+</script></body></html>
