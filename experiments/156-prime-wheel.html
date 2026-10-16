@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prime Wheel</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b10;color:#c7c9c5;font-family:ui-monospace,SFMono-Regular,monospace}
+  canvas{display:block} .label{position:fixed;left:22px;top:18px;pointer-events:none;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:#90989a}
+  .note{position:fixed;left:22px;bottom:20px;max-width:360px;pointer-events:none;font-size:11px;line-height:1.6;color:#747d80}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+<div class="label">156 / prime wheel <span id="readout"></span></div>
+<div class="note">A wheel is made from the places a number cannot be. Click to add the next forbidden divisor; the empty spokes become rarer, never evenly spaced.</div>
+<script>
+const divisors=[2,3,5,7,11,13,17,19,23,29,31];
+let level=0, points=[];
+function rebuild(){
+  const limit=divisors.slice(0,level+1).reduce((a,b)=>a*b,1);
+  const step=Math.max(1,Math.ceil(limit/5200)); points=[];
+  for(let n=1;n<=limit;n+=step){
+    if(divisors.slice(0,level+1).every(p=>n===p||n%p!==0)) points.push(n/limit);
+  }
+  document.getElementById('readout').textContent=` · wheel ${limit} / ${points.length} survivors`;
+}
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);rebuild();noLoop();}
+function draw(){
+  background(9,11,16); translate(width/2,height/2);
+  const radius=Math.min(width,height)*.39;
+  noFill();stroke(80,88,91,80);strokeWeight(1);circle(0,0,radius*2);
+  // Each survivor marks its angular address; repeated radial bands expose the wheel's hidden period.
+  const bands=5+level;
+  for(let b=0;b<bands;b++){
+    const r=radius*(.22+.76*b/(bands-1));
+    for(const q of points){
+      const a=TWO_PI*q-HALF_PI;
+      const wobble=Math.sin(q*TAU*(level+3)+b*.8)*1.8;
+      const x=Math.cos(a)*(r+wobble),y=Math.sin(a)*(r+wobble);
+      const bright=110+105*Math.sin(q*TAU*13+b*.31)**2;
+      stroke(160,bright,190,105+100*b/bands);strokeWeight(q<.012?2.1:1.15);point(x,y);
+    }
+  }
+  noStroke();fill(190,197,188,150);circle(0,0,3);
+  fill(94,106,108,170);textAlign(CENTER,CENTER);textSize(10);text(`mod ${divisors.slice(0,level+1).join(' × ')}`,0,radius*.09);
+}
+function mousePressed(){level=(level+1)%divisors.length;rebuild();redraw();}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);redraw();}
+</script>
+</body>
+</html>
