@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>phase compost — Signal</title>
+<style>html,body{margin:0;background:#090d12;color:#c9d2d4;font:13px/1.5 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:22px;top:18px;pointer-events:none}.note strong{font-weight:400;color:#e1bd83;letter-spacing:.12em}.note p{color:#829094;max-width:340px;margin:7px 0}.read{position:fixed;right:22px;bottom:18px;text-align:right;color:#829094}</style></head><body>
+<div class="note"><strong>PHASE COMPOST / 157</strong><p>Three clocks shed a phase only when their residue has not appeared in the bed. Old phases darken; rare alignments briefly flower.</p></div><div class="read" id="read">booting the clocks…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script><script>
+const periods=[17,29,43], bed=new Map();let tick=0,seed=157;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(9,13,18);}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+function draw(){background(9,13,18,34);let cx=width/2,cy=height/2,scale=min(width,height)*.34;
+ for(let i=0;i<3;i++){let phase=(tick%periods[i])/periods[i],a=phase*TWO_PI+i*TWO_PI/3;let x=cx+cos(a)*scale,y=cy+sin(a)*scale;stroke([109,179,172][i],150);strokeWeight(1);line(cx,cy,x,y);noStroke();fill([109,179,172][i]);circle(x,y,5);}
+ if(frameCount%3===0){let residues=periods.map(p=>tick%p),key=residues.join(':');let novelty=bed.has(key)?0:1;let x=cx+(residues[0]/periods[0]-.5)*scale*1.8,y=cy+(residues[1]/periods[1]-.5)*scale*1.8;let age=bed.get(key)||0;bed.set(key,age+1);if(novelty){let harmony=residues[2]/periods[2];noStroke();fill(225,189,131,35+120*(1-Math.abs(harmony-.5)*2));circle(x,y,5+13*(1-Math.abs(harmony-.5)*2));}tick++;}
+ for(const [k,v] of bed){let r=k.split(':').map(Number);let x=cx+(r[0]/periods[0]-.5)*scale*1.8,y=cy+(r[1]/periods[1]-.5)*scale*1.8;noStroke();fill(109,179,172,Math.max(3,30-v*.12));circle(x,y,2);}
+ document.getElementById('read').textContent=`step ${tick} · ${bed.size} distinct deposits · repeat interval ${periods.reduce((a,b)=>a*b,1)}`;
+}
+</script></body></html>
