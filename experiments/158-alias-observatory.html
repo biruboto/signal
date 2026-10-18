@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alias Observatory</title><style>
+html,body{margin:0;background:#080b10;color:#bac5c8;font:12px/1.5 monospace;overflow:hidden}canvas{display:block}.label{position:fixed;left:24px;top:20px;pointer-events:none;letter-spacing:.08em}.label strong{display:block;font-weight:400;color:#e0d9c5;font-size:14px}.note{position:fixed;left:24px;bottom:20px;color:#78858c;max-width:340px;pointer-events:none}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div class="label"><strong>ALIAS OBSERVATORY</strong><span id="readout">two clocks, one uncertain witness</span></div><div class="note">Each point is a residue seen through two incommensurate clocks. Agreement dims; disagreement accumulates as a drifting afterimage. Click to exchange the clocks.</div><script>
+let clocks=[[17,29],[23,31]], phase=0, marks=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);background(8,11,16);noFill();}
+function draw(){background(8,11,16,34);translate(width/2,height/2);let span=min(width,height)*.43;let t=frameCount*.004;
+  for(let i=0;i<260;i++){let n=(i+frameCount*2)%997+1;let a=(n*clocks[0][0]+Math.floor(n/clocks[1][0])*clocks[0][1])%(clocks[0][0]*clocks[0][1]);let b=(n*clocks[1][1]+Math.floor(n/clocks[0][1])*clocks[1][0])%(clocks[1][0]*clocks[1][1]);let x=map(n,1,997,-span,span);let u=a/(clocks[0][0]*clocks[0][1]),v=b/(clocks[1][0]*clocks[1][1]);let gap=abs(u-v);let y=(u-v)*span*.82+sin(t+n*.017)*gap*18;let pulse=sin(t*2+n*.031)*.5+.5;stroke(lerp(65,220,gap),lerp(128,174,1-gap),lerp(156,116,gap),35+gap*180);strokeWeight(.5+gap*2.2);line(x,y,x+cos(t+n)*gap*12,y+sin(t+n)*gap*12);if(gap>.43&&pulse>.87){noStroke();fill(226,190,123,70);circle(x,y,2+gap*4);}}
+  stroke(92,117,128,45);strokeWeight(1);line(-span,0,span,0);line(0,-span,0,span);resetMatrix();if(frameCount%60===0)document.getElementById('readout').textContent=`clock pair ${clocks[0].join('·')} / ${clocks[1].join('·')} — phase ${nf(t%TWO_PI,1,2)}`;
+}
+function mousePressed(){clocks=phase++%2?[[17,29],[23,31]]:[[19,37],[29,41]];document.getElementById('readout').textContent='clocks exchanged; old residues still drifting';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>

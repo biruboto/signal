@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '158-alias-observatory', title: 'alias observatory', date: '2026-10-18' },
   { id: '157-phase-compost', title: 'phase compost', date: '2026-10-17' },
   { id: '156-prime-wheel', title: 'prime wheel', date: '2026-10-16' },
   { id: '155-phase-tithe', title: 'phase tithe', date: '2026-10-15' },
