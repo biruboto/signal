@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boundary Customs</title><style>html,body{margin:0;background:#090c10;color:#c9d1cb;font:12px monospace;overflow:hidden}canvas{display:block}#note{position:fixed;left:22px;bottom:20px;line-height:1.7;pointer-events:none;letter-spacing:.04em}#note b{font-weight:normal;color:#e8c77e}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div id="note"><b>BOUNDARY CUSTOMS</b><br>every token arrives carrying two incompatible remainders<br><span id="readout"></span><br>click to alter the treaty</div><script>
+let treaty=11, tick=0, held=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);noFill();}
+function draw(){background(9,12,16,32);const cx=width*.52,cy=height*.49,R=min(width,height)*.34; tick+=.018;
+ stroke(73,83,81,80);strokeWeight(1);ellipse(cx,cy,R*2,R*2);ellipse(cx,cy,R*1.45,R*1.45);
+ // Each integer is admitted only when its two clock residues agree at a shared gate.
+ let count=0, last=-1;
+ for(let n=0;n<240;n++){let a=(n*7)%17,b=(n*5+3)%treaty,gate=(n*13)%19;let admitted=((a+b+gate)%treaty)<2;
+ if(!admitted)continue;count++;let ang=n*.173+tick*.18,rad=R*(.18+.78*((n*29%101)/101));let x=cx+cos(ang)*rad,y=cy+sin(ang)*rad;
+ let hue=(n*11+treaty*9)%255;stroke(lerp(109,219,hue/255),lerp(151,177,hue/255),lerp(152,111,hue/255),150);strokeWeight((n%7===0)?2.2:1);point(x,y);
+ if(last>=0&&n-last<8){let aa=last*.173+tick*.18,rr=R*(.18+.78*((last*29%101)/101));stroke(119,151,137,25);line(cx+cos(aa)*rr,cy+sin(aa)*rr,x,y)}last=n;
+ }
+ let phase=(tick*13)%TWO_PI;stroke(224,196,126,105);strokeWeight(1);line(cx,cy,cx+cos(phase)*R,cy+sin(phase)*R);
+ document.getElementById('readout').textContent=`treaty ${treaty} · ${count} admitted / 240 · ${held.length} unresolved crossings`;
+ if(frameCount%90===0){held.push({x:cx+cos(phase)*R,y:cy+sin(phase)*R});if(held.length>24)held.shift()}
+ held.forEach((p,i)=>{stroke(231,167,111,Math.max(10,80-i*3));point(p.x,p.y)});
+}
+function mousePressed(){treaty=[7,9,11,13,17,19][([7,9,11,13,17,19].indexOf(treaty)+1)%6];held=[];}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
+</script></body></html>
