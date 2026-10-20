@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>witness weather — Signal</title>
+<style>
+html,body{margin:0;background:#101317;color:#d8d7cf;font:14px/1.5 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:24px;top:20px;pointer-events:none;text-shadow:0 1px 8px #101317}.note strong{font-weight:400;letter-spacing:.16em;text-transform:uppercase}.note p{color:#92999a;margin:.35em 0}.foot{position:fixed;right:24px;bottom:20px;color:#92999a;text-align:right;pointer-events:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body><div class="note"><strong>witness weather</strong><p id="readout">A divisor is a witness; a prime is an unanswered claim.</p></div><div class="foot">click to change the witness horizon<br>160 / signal</div>
+<script>
+let horizon=37, grains=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);noFill();seed();}
+function seed(){grains=[];const count=Math.min(2100,Math.floor(width*height/520));for(let i=0;i<count;i++){const n=2+Math.floor(Math.random()*horizon*3);let d=0;for(let k=2;k*k<=n;k++)if(n%k===0){d=k;break;}grains.push({n,d,x:Math.random(),y:Math.random(),phase:Math.random()*TWO_PI,life:.25+Math.random()*.75});}}
+function draw(){background(16,19,23,28);const t=millis()*.00018;blendMode(ADD);for(const g of grains){const x=g.x*width,y=g.y*height;const angle=g.phase+t*(g.d?1+g.d%5:0.28);const drift=sin(angle+g.n*.13)*18;const certainty=g.d?1/(1+g.d%11):.22;const alpha=18+certainty*48;stroke(g.d?145+g.d%5*8:198,g.d?176:146,g.d?151:111,alpha*g.life);strokeWeight(g.d?0.7:1.15);if(g.d){line(x,y,x+cos(angle)*drift,y+sin(angle)*drift);point(x+cos(angle)*drift,y+sin(angle)*drift);}else{const r=2+4*(.5+.5*sin(angle));ellipse(x,y,r,r);}}blendMode(BLEND);}
+function mousePressed(){horizon=horizon===37?53:horizon===53?71:37;seed();document.getElementById('readout').textContent=`Witness horizon ${horizon}: composites borrow a divisor; primes keep their claim.`;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);seed();}
+</script></body></html>

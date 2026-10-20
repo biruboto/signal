@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '160-witness-weather', title: 'witness weather', date: '2026-10-20' },
   { id: '159-boundary-customs', title: 'boundary customs', date: '2026-10-19' },
   { id: '158-alias-observatory', title: 'alias observatory', date: '2026-10-18' },
   { id: '157-phase-compost', title: 'phase compost', date: '2026-10-17' },
