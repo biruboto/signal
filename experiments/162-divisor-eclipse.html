@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>divisor eclipse</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b10;color:#d9d7cc;font:13px/1.5 ui-monospace,SFMono-Regular,monospace}canvas{display:block}#note{position:fixed;left:24px;bottom:22px;max-width:390px;pointer-events:none;text-shadow:0 1px 8px #090b10}#note strong{font-weight:400;color:#e6bd78;letter-spacing:.12em;text-transform:uppercase}#note div{margin-top:7px;color:#92959a}.hint{position:fixed;right:24px;bottom:22px;color:#737780}
+</style></head><body>
+<div id="note"><strong>divisor eclipse</strong><div id="readout">A number is hidden where its divisors agree.</div></div><div class="hint">click to change the hidden number</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script>
+let hidden=84, phase=0, rings=[], maxD=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);build();}
+function build(){rings=[];maxD=0;for(let d=2;d<=hidden;d++){if(hidden%d===0){rings.push(d);maxD=Math.max(maxD,d);}}}
+function draw(){background(9,11,16);phase+=0.003;let cx=width*.5,cy=height*.49,base=min(width,height)*.12, span=min(width,height)*.34;
+ noFill();stroke(255,255,255,12);circle(cx,cy,base*2);
+ // Each divisor is a clock; only its returning marks can eclipse the center.
+ for(let j=0;j<rings.length;j++){let d=rings[j],r=base+span*(j+1)/(rings.length+1),a=phase*(1+1/d)+j*.37;let pulse=(sin(phase*2+d*.31)+1)/2;stroke(185+55*pulse,155+45*pulse,105+35*pulse,35+100*pulse);strokeWeight(d===maxD?1.5:0.8);circle(cx,cy,r*2);
+ let teeth=min(d,96);for(let k=0;k<teeth;k++){let t=TWO_PI*k/teeth+a, x=cx+cos(t)*r,y=cy+sin(t)*r;let mark=(k%max(1,round(d/max(2,hidden/d)))===0);stroke(mark?238:112,mark?198:133,mark?128:154,mark?190:55);strokeWeight(mark?2:1);point(x,y);if(mark&&pulse>.78){stroke(238,198,128,22);line(cx,cy,x,y);}}
+ }
+ noStroke();fill(230,190,125,210);circle(cx,cy,3+2*sin(phase*3));fill(180,182,180,100);textAlign(CENTER);textSize(11);text('n = '+hidden,cx,cy+base+19);
+}
+function mousePressed(){if(mouseX>width*.72&&mouseY<height*.15)return;hidden=hidden===84?random([90,96,105,110,120,126,132,143,150,154,165,180,196,210]):random([72,84,90,96,105,110,120,126,132,143,150,154,165,180,196,210]);hidden=int(hidden);build();document.getElementById('readout').textContent='The rings are divisors of '+hidden+'; their shared returns make a temporary shadow.';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
