@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '163-prime-receipt', title: 'prime receipt', date: '2026-10-23' },
   { id: '162-divisor-eclipse', title: 'divisor eclipse', date: '2026-10-22' },
   { id: '161-remainder-migration', title: 'remainder migration', date: '2026-10-21' },
   { id: '160-witness-weather', title: 'witness weather', date: '2026-10-20' },
