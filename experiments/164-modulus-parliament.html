@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>modulus parliament</title>
+<style>html,body{margin:0;background:#090b10;color:#d8d5c8;font:12px ui-monospace,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:22px;bottom:20px;line-height:1.6;pointer-events:none;letter-spacing:.04em}.note b{font-weight:400;color:#f1c982}.hint{color:#777}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script></head><body><div class="note"><b>MODULUS PARLIAMENT</b><br><span id="readout">Residue blocs convene.</span><br><span class="hint">Each column is an integer. Each voice votes by its remainder.</span><br><span class="hint">click to change the coalition</span></div><script>
+let pools=[[5,7,9,11,13],[4,6,9,10,14],[5,8,12,15,17]], poolIndex=0, mods=pools[0], offset=0, palette=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);noStroke();palette=[color(218,128,100),color(236,190,112),color(123,185,165),color(133,160,220),color(193,143,211)];drawField()}
+function drawField(){background(9,11,16);let top=height*.15, bottom=height*.82, rows=mods.length, cellH=(bottom-top)/rows, cellW=max(2,width/220); let start=floor(offset);
+ for(let r=0;r<rows;r++){let m=mods[r]; for(let x=0;x<width;x+=cellW){let n=start+floor(x/cellW), rem=((n%m)+m)%m;let phase=rem/m;let strength=.24+.76*(.5+.5*sin(TWO_PI*phase));let c=lerpColor(color(18,22,30),palette[r],strength);fill(c);rect(x,top+r*cellH,cellW-1,cellH-2)} fill(210,205,190,170);textAlign(LEFT,CENTER);textSize(11);text('mod '+mods[r],12,top+r*cellH+cellH/2)}
+ // lower band: count distinct residues at each position, a measure of disagreement
+ let y=bottom+28, h=max(8,height-bottom-70); for(let x=0;x<width;x+=cellW){let n=start+floor(x/cellW), distinct=new Set(mods.map(m=>((n%m)+m)%m)).size;let a=distinct/mods.length;fill(145,166,201,35+190*a);rect(x,y,cellW-1,h*a)}fill(160,158,148,150);textAlign(LEFT,TOP);text('DISSENT / distinct remainder classes',12,bottom+7);
+ document.getElementById('readout').textContent=`voices ${mods.join(' · ')}   /   window begins ${start}`; }
+function draw(){offset+=.12;drawField()}function mousePressed(){poolIndex=(poolIndex+1)%pools.length;mods=pools[poolIndex];}function windowResized(){resizeCanvas(windowWidth,windowHeight);redraw()}
+</script></body></html>
