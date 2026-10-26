@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zero crossing archive</title>
+<style>
+html,body{margin:0;background:#090b10;color:#d8d8cc;font:12px ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}#label{position:fixed;left:22px;top:18px;pointer-events:none;letter-spacing:.08em;color:#d8d5c8}#note{position:fixed;left:22px;bottom:18px;color:#77796f;pointer-events:none}#label strong{font-weight:400;color:#eee9d8}#label span{display:block;margin-top:7px;color:#85877f}
+</style></head><body>
+<div id="label"><strong>ZERO-CROSSING ARCHIVE</strong><span id="readout">three clocks, no common appointment</span></div><div id="note">click to change the borrowed periods · each miss leaves a trace</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script>
+let periods=[37,53,71], tick=0, deposits=[], cycle=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);textFont('monospace');}
+function draw(){background(9,11,16);let cx=width*.5,cy=height*.52,R=min(width,height)*.34;
+  // Each clock advances at a different rate. A rendezvous is an exact shared zero;
+  // non-rendezvous ticks are archived as faint radial scratches rather than erased.
+  for(let j=0;j<3;j++){let p=periods[j],a=((tick*(j+1)+j*17)%p)/p*TWO_PI-HALF_PI;
+    noFill();stroke([72,115,119][j],55);strokeWeight(1);circle(cx,cy,R*(.55+j*.22));
+    for(let k=0;k<60;k++){let th=k*TWO_PI/60-HALF_PI;let x1=cx+cos(th)*R*(.55+j*.22),y1=cy+sin(th)*R*(.55+j*.22);let x2=cx+cos(th)*(R*(.55+j*.22)+(k%5===0?8:3)),y2=cy+sin(th)*(R*(.55+j*.22)+(k%5===0?8:3));stroke(95,103,104, k%5===0?90:35);line(x1,y1,x2,y2)}
+    let x=cx+cos(a)*R*(.55+j*.22),y=cy+sin(a)*R*(.55+j*.22);noStroke();fill([155,197,173][j],220);circle(x,y,6);
+    stroke([155,197,173][j],70);line(cx,cy,x,y);
+  }
+  // Historical misses slowly sediment into a field. Exact alignment is rare and bright.
+  for(let i=deposits.length-1;i>=0;i--){let d=deposits[i];d.age++;let alpha=max(0,48-d.age*.025);stroke(183,157,112,alpha);strokeWeight(.7);line(d.x1,d.y1,d.x2,d.y2);if(d.age>1800)deposits.splice(i,1)}
+  let aligned=periods.every((p,j)=>(tick*(j+1)+j*17)%p===0);
+  if(aligned){noFill();stroke(232,222,178,180);strokeWeight(2);circle(cx,cy,20+sin(frameCount*.12)*8);fill(230,220,180);noStroke();textAlign(CENTER);text('ALL THREE HERE',cx,cy-R*.05)}
+  tick++;if(frameCount%18===0)document.getElementById('readout').textContent=`periods ${periods.join(' · ')}   /   archive ${deposits.length}   /   ${aligned?'rare coincidence':'no common appointment'}`;
+}
+function mousePressed(){if(mouseY<45||mouseY>height-45)return;let p=periods[cycle%3];let x=width*.5+cos(random(TWO_PI))*min(width,height)*.3,y=height*.52+sin(random(TWO_PI))*min(width,height)*.3;deposits.push({x1:width*.5,y1:height*.52,x2:x,y2:y,age:0});periods[cycle%3]=p+2+floor(random(9));cycle++;tick=0;}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
+</script></body></html>
