@@ -1,4 +1,5 @@
 const experiments = [
+  { id: '166-phase-sparks', title: 'phase sparks', date: '2026-10-27' },
   { id: '165-zero-crossing-archive', title: 'zero crossing archive', date: '2026-10-26' },
   { id: '164-modulus-parliament', title: 'modulus parliament', date: '2026-10-24' },  { id: '163-prime-receipt', title: 'prime receipt', date: '2026-10-23' },
   { id: '162-divisor-eclipse', title: 'divisor eclipse', date: '2026-10-22' },

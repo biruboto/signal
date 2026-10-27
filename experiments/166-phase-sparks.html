@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>phase sparks</title>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b10;color:#e5dfce;font-family:Georgia,serif}
+  canvas{display:block} .label{position:fixed;left:clamp(20px,5vw,70px);top:clamp(20px,5vh,48px);pointer-events:none}
+  h1{font-size:clamp(20px,3vw,30px);font-weight:400;letter-spacing:.08em;margin:0 0 9px}.sub{font:11px/1.6 monospace;color:#8a8c91;letter-spacing:.08em}
+  .note{position:fixed;right:clamp(20px,5vw,70px);bottom:clamp(20px,5vh,42px);text-align:right;font:10px/1.8 monospace;color:#777d86;letter-spacing:.06em;pointer-events:none}
+  .hint{position:fixed;left:clamp(20px,5vw,70px);bottom:clamp(20px,5vh,42px);font:10px monospace;color:#666c76;letter-spacing:.1em;pointer-events:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+<div class="label"><h1>phase sparks</h1><div class="sub" id="readout">three prime clocks, one borrowed instant</div></div>
+<div class="hint">CLICK TO RESEED THE CLOCKS</div><div class="note">ALIGNMENT IS NOT ARRIVAL<br>IT IS A TEMPORARY WEATHER</div>
+<script>
+const clocks=[7,11,17];
+let sparks=[], origin, lastCycles=[0,0,0], cycleCount=0;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);origin=millis();background(9,11,16);}
+function draw(){
+  noStroke();fill(9,11,16,24);rect(0,0,width,height);
+  const t=(millis()-origin)/1000, cx=width*.5, cy=height*.53;
+  const scale=min(width,height)*.29;
+  let phases=clocks.map((p,i)=>((t/(p*1.23)+i/3)%1)*TWO_PI);
+  let positions=phases.map((a,i)=>({x:cx+cos(a-i*.55)*scale*(.66+i*.16),y:cy+sin(a-i*.55)*scale*(.66+i*.16)}));
+  // Each clock leaves a faint orbit; near-concurrence emits a short-lived spark.
+  noFill();strokeWeight(1);
+  positions.forEach((p,i)=>{stroke(100+35*i,120+12*i,145+8*i,30);ellipse(cx,cy,scale*(1.32+i*.32));});
+  positions.forEach((p,i)=>{noStroke();fill(190+20*i,190-9*i,160+20*i,180);circle(p.x,p.y,3+i*.7);});
+  let spread=Math.max(...phases)-Math.min(...phases); spread=Math.min(spread,TWO_PI-spread);
+  const closeness=Math.max(0,1-spread/0.48);
+  if(closeness>.45 && random()<.55){
+    let x=positions.reduce((s,p)=>s+p.x,0)/3, y=positions.reduce((s,p)=>s+p.y,0)/3;
+    sparks.push({x:x+random(-9,9),y:y+random(-9,9),life:1,r:random(2,7),h:random(32,65)});
+  }
+  sparks=sparks.filter(s=>s.life>.02);
+  sparks.forEach(s=>{noStroke();fill(235,205,s.h,s.life*180);circle(s.x,s.y,s.r*s.life);s.life*=.978;});
+  const whole=Math.floor(t/((7*11*17)*1.23));
+  if(whole>cycleCount){cycleCount=whole;document.getElementById('readout').textContent=`${cycleCount} full return${cycleCount===1?'':'s'} · nearest meeting leaves a spark`;}
+  // A hairline traces the shared center, not any clock's path.
+  stroke(130,138,150,42);line(cx-5,cy,cx+5,cy);line(cx,cy-5,cx,cy+5);
+}
+function mousePressed(){origin=millis();sparks=[];cycleCount=0;document.getElementById('readout').textContent='three prime clocks, one borrowed instant';}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);background(9,11,16);}
+</script>
+</body>
+</html>
