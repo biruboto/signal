@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veto Bloom</title>
+<style>
+html,body{margin:0;background:#090b10;color:#d9d5c9;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:24px;top:20px;pointer-events:none;letter-spacing:.08em;text-transform:uppercase;color:#c9c1aa}.note small{display:block;margin-top:5px;color:#777b85;text-transform:none;letter-spacing:0}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body><div class="note">VETO BLOOM <small id="readout">each clock cancels every collision it joins · click to reshuffle</small></div>
+<script>
+let clocks=[5,7,11,13,17,19], phase=0, drift=0, colors=[];
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);colors=[color(235,162,111),color(128,190,206),color(202,177,108),color(170,145,204),color(119,180,143),color(212,127,144)];}
+function draw(){background(9,11,16,24);translate(width/2,height/2);let R=min(width,height)*.39;phase=(phase+.002+drift*.00002)%1;
+ // Each clock advances on its own period. A tick survives only if no other clock ticks with it.
+ let t=frameCount; let ticks=clocks.map((p,i)=>((t+Math.floor(phase*997)+i*3)%p)===0);
+ let active=ticks.reduce((a,b)=>a+(b?1:0),0);
+ for(let i=0;i<clocks.length;i++){let a=TWO_PI*i/clocks.length- HALF_PI;let x=cos(a)*R,y=sin(a)*R;noFill();stroke(45,50,60,110);strokeWeight(1);ellipse(x,y,7,7);
+   if(ticks[i]&&active===1){let c=colors[i];let rad=R*(.18+.78*noise(i*9+t*.001));let bend=sin(t*.013+i*2)*.45;let x2=cos(a+bend)*rad,y2=sin(a+bend)*rad;stroke(red(c),green(c),blue(c),180);strokeWeight(1.2);line(x,y,x2,y2);noStroke();fill(c);circle(x2,y2,3+2*noise(t*.02+i));}
+   else if(ticks[i]&&active>1){noStroke();fill(100,105,118,25);circle(x,y,5+active*2);}
+ }
+ // faint orbital traces, perturbed by the count of collisions
+ noFill();stroke(80,91,112,18);strokeWeight(1);beginShape();for(let k=0;k<180;k++){let a=TWO_PI*k/180;let wobble=sin(a*clocks.length+frameCount*.006)*active*2;vertex(cos(a)*(R+wobble),sin(a)*(R+wobble));}endShape(CLOSE);
+}
+function mousePressed(){if(mouseX<width&&mouseY<height){clocks=Array.from({length:6},()=>floor(random(5,23))|1);drift=random(-8,8);document.getElementById('readout').textContent='periods '+clocks.join(' · ')+' — solitary ticks survive; collisions leave dim knots';}}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);}
+</script></body></html>
