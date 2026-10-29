@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scarcity Choir</title>
+<style>
+html,body{margin:0;background:#090b10;color:#c9cbd2;font:12px/1.5 ui-monospace,SFMono-Regular,monospace;overflow:hidden}canvas{display:block}.note{position:fixed;left:24px;top:20px;pointer-events:none;letter-spacing:.08em;text-transform:uppercase;color:#9298a8}.note small{display:block;margin-top:7px;color:#596171;text-transform:none;letter-spacing:0}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body><div class="note">scarcity choir<small id="readout">each tone may occupy one interval; ties go quiet</small></div>
+<script>
+let voices=[], tick=0, horizon=96;
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(1);for(let i=0;i<11;i++)voices.push({period:7+i*3,phase:Math.floor(Math.random()*13),pitch:i, hue:180+i*7});noLoop();}
+function draw(){background(9,11,16);let left=38, top=100, w=width-76, h=height-145, cell=w/horizon, row=h/voices.length;
+// A voice proposes one pulse per period. At each time, only the least recently admitted claimant sings.
+let lastAccepted=-99;
+for(let t=0;t<horizon;t++){
+ let candidates=[];for(let v=0;v<voices.length;v++){let a=voices[v];if((t+a.phase)%a.period===0)candidates.push({v,a,age:t-lastAccepted});}
+ candidates.sort((x,y)=>y.age-x.age || ((x.v+y.v+t)%2?1:-1));
+ let winner=candidates[0]?.v;
+ for(let v=0;v<voices.length;v++){
+  let x=left+t*cell,y=top+v*row,claim=(t+voices[v].phase)%voices[v].period===0;
+  noStroke();fill(30,34,44,100);rect(x,y,Math.max(1,cell-.7),Math.max(1,row-2));
+  if(claim&&v===winner){fill(130+v*7,205,225,220);rect(x,y+2,Math.max(1,cell-1),Math.max(2,row-5));lastAccepted=t;}
+  else if(claim){fill(74,62,84,160);circle(x+cell/2,y+row/2,Math.min(3,row*.28));}
+ }
+}
+noStroke();fill(125,132,148);text('time →',left,top+h+20);for(let i=0;i<voices.length;i++){fill(90,98,115);text('voice '+String(i+1).padStart(2,'0'),left,top+(i+.7)*row);}
+}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);redraw();}
+</script></body></html>
