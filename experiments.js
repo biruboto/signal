@@ -1,6 +1,6 @@
 const experiments = [
-  { id: '168-scarcity-choir', title: 'scarcity choir', date: '2026-10-29' },
-  { id: '167-veto-bloom', title: 'veto bloom', date: '2026-10-28' },
+  { id: '169-parity-levy', title: 'parity levy', date: '2026-10-30' },
+  { id: '168-scarcity-choir', title: 'scarcity choir', date: '2026-10-29' },  { id: '167-veto-bloom', title: 'veto bloom', date: '2026-10-28' },
   { id: '166-phase-sparks', title: 'phase sparks', date: '2026-10-27' },
   { id: '165-zero-crossing-archive', title: 'zero crossing archive', date: '2026-10-26' },
   { id: '164-modulus-parliament', title: 'modulus parliament', date: '2026-10-24' },  { id: '163-prime-receipt', title: 'prime receipt', date: '2026-10-23' },
